@@ -26,3 +26,6 @@ markers = [
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+telegram-bot = "telegram_bot.main:main"

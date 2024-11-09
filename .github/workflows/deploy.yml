@@ -12,157 +12,58 @@ on:
           - staging
           - dev
   push:
-    branches:
-      - main
-      - staging
-      - develop
-    paths:
-      - 'telegram-bot/**'
-      - '.github/workflows/deploy.yml'
+    branches: [main, staging, develop]
 
 jobs:
-  determine-environment:
-    runs-on: ubuntu-latest
-    outputs:
-      environment: ${{ steps.set-env.outputs.environment }}
-    steps:
-      - id: set-env
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "environment=production" >> $GITHUB_OUTPUT
-          elif [ "${{ github.ref }}" = "refs/heads/staging" ]; then
-            echo "environment=staging" >> $GITHUB_OUTPUT
-          elif [ "${{ github.ref }}" = "refs/heads/develop" ]; then
-            echo "environment=dev" >> $GITHUB_OUTPUT
-          fi
-
   deploy:
-    needs: determine-environment
     runs-on: ubuntu-latest
-    environment: ${{ needs.determine-environment.outputs.environment }}
-    
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       
-      - name: Get Python version from pyproject.toml
-        id: python-version
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+      
+      - name: Setup Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+      
+      - name: Run Tests
+        run: nix run .#test
+      
+      - name: Setup SSH
         run: |
-          PYTHON_VERSION=$(grep "python = " ./telegram-bot/pyproject.toml | sed 's/python = "\^//' | sed 's/"//')
-          echo "version=$PYTHON_VERSION" >> $GITHUB_OUTPUT
+          echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > private_key
+          chmod 600 private_key
           
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ steps.python-version.outputs.version }}
-          
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          
-      - name: Install dependencies
-        working-directory: ./telegram-bot
-        run: poetry install
-        
-      - name: Run tests
-        working-directory: ./telegram-bot
-        run: poetry run pytest
-        
-      - name: Build deployment package
-        working-directory: ./telegram-bot
-        run: |
-          poetry export -f requirements.txt --output requirements.txt --without-hashes
-          zip -r deployment.zip . -x "*.git*" -x "*.pytest_cache*" -x "*__pycache__*" -x "*.env*"
-          
-      - name: Deploy to AWS EC2
+      - name: Setup Remote Environment
         env:
-          PRIVATE_KEY: ${{ secrets.AWS_SSH_PRIVATE_KEY }}
-          HOST: ${{ secrets.AWS_HOST }}
-          USERNAME: ${{ secrets.AWS_USERNAME }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          POLLING_INTERVAL: '3.0'
-          LOG_LEVEL: 'INFO'
-          PYTHON_VERSION: ${{ steps.python-version.outputs.version }}
+          SSH_OPTS: "-i private_key -o StrictHostKeyChecking=no"
+          REMOTE: "${{ secrets.AWS_USERNAME }}@${{ secrets.AWS_HOST }}"
         run: |
-          # Write the private key to a file
-          echo "$PRIVATE_KEY" > private_key.pem
-          chmod 600 private_key.pem
-          
-          # Copy files to server
-          scp -i private_key.pem -o StrictHostKeyChecking=no ./telegram-bot/deployment.zip $USERNAME@$HOST:~/
-          
-          # Deploy commands
-          ssh -i private_key.pem -o StrictHostKeyChecking=no $USERNAME@$HOST << EOF
-            set -e # Exit on error
-            
-            echo "Stopping existing service..."
-            sudo systemctl stop telegram-bot || true
-            
-            echo "Cleaning up previous deployment..."
-            rm -rf ~/telegram-bot
-            mkdir -p ~/telegram-bot
-            
-            echo "Extracting new deployment..."
-            unzip -o ~/deployment.zip -d ~/telegram-bot
-            rm ~/deployment.zip
-            
-            echo "Creating .env file..."
-            echo "TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}\nPOLLING_INTERVAL=${POLLING_INTERVAL}\nLOG_LEVEL=${LOG_LEVEL}" > ~/telegram-bot/.env
-            
-            echo "Checking for Python ${PYTHON_VERSION}..."
-            if command -v python${PYTHON_VERSION} &> /dev/null; then
-                echo "Python ${PYTHON_VERSION} is already installed"
-            else
-                echo "Installing Python ${PYTHON_VERSION}..."
-                sudo yum update -y
-                sudo yum install -y gcc openssl-devel bzip2-devel libffi-devel wget
-                
-                # Get latest minor version with debug output
-                echo "Finding latest Python ${PYTHON_VERSION} version..."
-                echo "Downloading Python versions list..."
-                VERSIONS_PAGE=$(wget -qO- https://www.python.org/ftp/python/)
-                echo "Available versions:"
-                echo "$VERSIONS_PAGE" | grep -o "${PYTHON_VERSION}.[0-9]*/"
-                
-                LATEST_VERSION=$(echo "$VERSIONS_PAGE" | grep -o "${PYTHON_VERSION}.[0-9]*/" | sort -V | tail -n1 | tr -d '/')
-                
-                if [ -z "$LATEST_VERSION" ]; then
-                    echo "Failed to detect latest version, using ${PYTHON_VERSION}.0"
-                    LATEST_VERSION="${PYTHON_VERSION}.0"
-                fi
-                
-                echo "Latest version: ${LATEST_VERSION}"
-                
-                # Download and install Python
-                cd /tmp
-                wget https://www.python.org/ftp/python/${LATEST_VERSION}/Python-${LATEST_VERSION}.tgz
-                tar xzf Python-${LATEST_VERSION}.tgz
-                cd Python-${LATEST_VERSION}
-                ./configure --enable-optimizations
-                sudo make altinstall
-                cd ~
-            fi
-            
-            echo "Installing dependencies..."
-            cd ~/telegram-bot
-            python${PYTHON_VERSION} -m pip install --upgrade pip
-            python${PYTHON_VERSION} -m pip install -r requirements.txt
-            
-            if [ ! -f deployment/telegram-bot.service ]; then
-              echo "Error: Service file not found!"
-              exit 1
-            fi
-            
-            echo "Setting up service..."
-            # Replace PYTHON_VERSION in service file
-            sed "s/\${PYTHON_VERSION}/${PYTHON_VERSION}/g" deployment/telegram-bot.service > deployment/telegram-bot.service.tmp
-            sudo mv deployment/telegram-bot.service.tmp /etc/systemd/system/telegram-bot.service
-            
-            echo "Starting service..."
-            sudo systemctl daemon-reload
-            sudo systemctl enable telegram-bot
-            sudo systemctl start telegram-bot
-            
-            echo "Checking service status..."
-            sudo systemctl status telegram-bot --no-pager
+          ssh $SSH_OPTS $REMOTE "sudo useradd -m telegram-bot || echo 'User already exists'"
+          ssh $SSH_OPTS $REMOTE "sudo mkdir -p /etc/telegram-bot"
+          ssh $SSH_OPTS $REMOTE "sudo tee /etc/telegram-bot/.env" << 'EOF'
+          TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+          POLLING_INTERVAL=3.0
+          LOG_LEVEL=INFO
+          EOF
+          ssh $SSH_OPTS $REMOTE "sudo chmod 600 /etc/telegram-bot/.env"
+          ssh $SSH_OPTS $REMOTE "sudo chown telegram-bot:telegram-bot /etc/telegram-bot/.env"
+      
+      - name: Copy Bot Binary
+        env:
+          SSH_OPTS: "-i private_key -o StrictHostKeyChecking=no"
+          REMOTE: "${{ secrets.AWS_USERNAME }}@${{ secrets.AWS_HOST }}"
+        run: |
+          export NIX_SSH_OPTS="$SSH_OPTS"
+          nix copy --to ssh://$REMOTE .#telegram-bot
+      
+      - name: Setup and Start Service
+        env:
+          SSH_OPTS: "-i private_key -o StrictHostKeyChecking=no"
+          REMOTE: "${{ secrets.AWS_USERNAME }}@${{ secrets.AWS_HOST }}"
+        run: |
+          nix eval --json .#serviceConfig | ssh $SSH_OPTS $REMOTE "sudo tee /etc/systemd/system/telegram-bot.service"
+          ssh $SSH_OPTS $REMOTE "sudo systemctl daemon-reload && sudo systemctl restart telegram-bot"
