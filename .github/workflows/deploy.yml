@@ -1,7 +1,6 @@
 name: Deploy Telegram Bot
 
 on:
-  # Allow manual triggers
   workflow_dispatch:
     inputs:
       environment:
@@ -12,7 +11,6 @@ on:
           - production
           - staging
           - dev
-  # Automatic triggers on push
   push:
     branches:
       - main
@@ -86,26 +84,41 @@ jobs:
           
           # Deploy commands
           ssh -i private_key.pem -o StrictHostKeyChecking=no $USERNAME@$HOST << 'EOF'
-            # Stop existing service if running
+            set -e # Exit on error
+            
+            echo "Stopping existing service..."
             sudo systemctl stop telegram-bot || true
             
-            # Clean up previous deployment
+            echo "Cleaning up previous deployment..."
             rm -rf ~/telegram-bot
             mkdir -p ~/telegram-bot
             
-            # Extract new deployment
+            echo "Extracting new deployment..."
             unzip -o ~/deployment.zip -d ~/telegram-bot
             rm ~/deployment.zip
             
-            # Install dependencies
+            echo "Installing pip if needed..."
+            sudo apt-get update
+            sudo apt-get install -y python3-pip
+            
+            echo "Installing dependencies..."
             cd ~/telegram-bot
+            python3 -m pip install --upgrade pip
             python3 -m pip install -r requirements.txt
             
-            # Copy service file
+            if [ ! -f deployment/telegram-bot.service ]; then
+              echo "Error: Service file not found!"
+              exit 1
+            fi
+            
+            echo "Setting up service..."
             sudo cp deployment/telegram-bot.service /etc/systemd/system/
             
-            # Reload and restart service
+            echo "Starting service..."
             sudo systemctl daemon-reload
             sudo systemctl enable telegram-bot
             sudo systemctl start telegram-bot
+            
+            echo "Checking service status..."
+            sudo systemctl status telegram-bot --no-pager
           EOF
