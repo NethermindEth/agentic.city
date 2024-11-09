@@ -131,4 +131,3 @@ jobs:
             
             echo "Checking service status..."
             sudo systemctl status telegram-bot --no-pager
-EOF
