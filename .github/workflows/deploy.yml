@@ -18,7 +18,7 @@ jobs:
       matrix:
         include:
           - branch: main
-            environment: prod
+            environment: production
           - branch: staging
             environment: staging
           - branch: develop
