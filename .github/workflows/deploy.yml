@@ -1,6 +1,18 @@
 name: Deploy Telegram Bot
 
 on:
+  # Allow manual triggers
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - production
+          - staging
+          - dev
+  # Automatic triggers on push
   push:
     branches:
       - main
@@ -11,21 +23,27 @@ on:
       - '.github/workflows/deploy.yml'
 
 jobs:
-  deploy:
+  determine-environment:
     runs-on: ubuntu-latest
-    
-    strategy:
-      matrix:
-        include:
-          - branch: main
-            environment: production
-          - branch: staging
-            environment: staging
-          - branch: develop
-            environment: dev
-    
-    if: github.ref == format('refs/heads/{0}', matrix.branch)
-    environment: ${{ matrix.environment }}
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+    steps:
+      - id: set-env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" = "refs/heads/staging" ]; then
+            echo "environment=staging" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" = "refs/heads/develop" ]; then
+            echo "environment=dev" >> $GITHUB_OUTPUT
+          fi
+
+  deploy:
+    needs: determine-environment
+    runs-on: ubuntu-latest
+    environment: ${{ needs.determine-environment.outputs.environment }}
     
     steps:
       - uses: actions/checkout@v4
@@ -90,4 +108,4 @@ jobs:
             sudo systemctl daemon-reload
             sudo systemctl enable telegram-bot
             sudo systemctl start telegram-bot
-          EOF 
+          EOF
