@@ -1,0 +1,100 @@
+name: Deploy Telegram Bot
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+      - develop
+    paths:
+      - 'telegram-bot/**'
+      - '.github/workflows/deploy.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        include:
+          - branch: main
+            environment: prod
+          - branch: staging
+            environment: staging
+          - branch: develop
+            environment: dev
+    
+    if: github.ref == format('refs/heads/{0}', matrix.branch)
+    environment: ${{ matrix.environment }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          
+      - name: Install dependencies
+        working-directory: ./telegram-bot
+        run: poetry install
+        
+      - name: Run tests
+        working-directory: ./telegram-bot
+        run: poetry run pytest
+        
+      - name: Build deployment package
+        working-directory: ./telegram-bot
+        run: |
+          poetry export -f requirements.txt --output requirements.txt --without-hashes
+          zip -r deployment.zip . -x "*.git*" -x "*.pytest_cache*" -x "*__pycache__*" -x "*.env*"
+          
+      - name: Deploy to AWS EC2
+        env:
+          PRIVATE_KEY: ${{ secrets.AWS_SSH_PRIVATE_KEY }}
+          HOST: ${{ secrets.AWS_HOST }}
+          USERNAME: ${{ secrets.AWS_USERNAME }}
+        run: |
+          # Write the private key to a file
+          echo "$PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+          
+          # Copy files to server
+          scp -i private_key.pem -o StrictHostKeyChecking=no ./telegram-bot/deployment.zip $USERNAME@$HOST:~/
+          
+          # Deploy commands
+          ssh -i private_key.pem -o StrictHostKeyChecking=no $USERNAME@$HOST << 'EOF'
+            # Stop existing service if running
+            sudo systemctl stop telegram-bot || true
+            
+            # Clean up previous deployment
+            rm -rf ~/telegram-bot
+            mkdir -p ~/telegram-bot
+            
+            # Extract new deployment
+            unzip -o ~/deployment.zip -d ~/telegram-bot
+            rm ~/deployment.zip
+            
+            # Install dependencies
+            cd ~/telegram-bot
+            python3 -m pip install -r requirements.txt
+            
+            # Copy service file
+            sudo cp deployment/telegram-bot.service /etc/systemd/system/
+            
+            # Reload and restart service
+            sudo systemctl daemon-reload
+            sudo systemctl enable telegram-bot
+            sudo systemctl start telegram-bot
+          EOF 

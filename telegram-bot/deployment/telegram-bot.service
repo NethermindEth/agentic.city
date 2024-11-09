@@ -1,0 +1,16 @@
+[Unit]
+Description=Telegram Bot Service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/telegram-bot
+Environment=PYTHONPATH=/home/ubuntu/telegram-bot
+EnvironmentFile=/home/ubuntu/telegram-bot/.env
+ExecStart=/usr/local/bin/python3 -m telegram_bot.main
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target 
