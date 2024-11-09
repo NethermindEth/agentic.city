@@ -118,9 +118,20 @@ jobs:
                 sudo yum update -y
                 sudo yum install -y gcc openssl-devel bzip2-devel libffi-devel wget
                 
-                # Get latest minor version
+                # Get latest minor version with debug output
                 echo "Finding latest Python ${PYTHON_VERSION} version..."
-                LATEST_VERSION=$(wget -qO- https://www.python.org/ftp/python/ | grep -o "${PYTHON_VERSION}.[0-9]*/" | sort -V | tail -n1 | tr -d '/')
+                echo "Downloading Python versions list..."
+                VERSIONS_PAGE=$(wget -qO- https://www.python.org/ftp/python/)
+                echo "Available versions:"
+                echo "$VERSIONS_PAGE" | grep -o "${PYTHON_VERSION}.[0-9]*/"
+                
+                LATEST_VERSION=$(echo "$VERSIONS_PAGE" | grep -o "${PYTHON_VERSION}.[0-9]*/" | sort -V | tail -n1 | tr -d '/')
+                
+                if [ -z "$LATEST_VERSION" ]; then
+                    echo "Failed to detect latest version, using ${PYTHON_VERSION}.0"
+                    LATEST_VERSION="${PYTHON_VERSION}.0"
+                fi
+                
                 echo "Latest version: ${LATEST_VERSION}"
                 
                 # Download and install Python
