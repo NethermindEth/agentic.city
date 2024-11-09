@@ -74,6 +74,9 @@ jobs:
           PRIVATE_KEY: ${{ secrets.AWS_SSH_PRIVATE_KEY }}
           HOST: ${{ secrets.AWS_HOST }}
           USERNAME: ${{ secrets.AWS_USERNAME }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          POLLING_INTERVAL: '3.0'
+          LOG_LEVEL: 'INFO'
         run: |
           # Write the private key to a file
           echo "$PRIVATE_KEY" > private_key.pem
@@ -83,7 +86,7 @@ jobs:
           scp -i private_key.pem -o StrictHostKeyChecking=no ./telegram-bot/deployment.zip $USERNAME@$HOST:~/
           
           # Deploy commands
-          ssh -i private_key.pem -o StrictHostKeyChecking=no $USERNAME@$HOST << 'EOF'
+          ssh -i private_key.pem -o StrictHostKeyChecking=no $USERNAME@$HOST << EOF
             set -e # Exit on error
             
             echo "Stopping existing service..."
@@ -96,6 +99,13 @@ jobs:
             echo "Extracting new deployment..."
             unzip -o ~/deployment.zip -d ~/telegram-bot
             rm ~/deployment.zip
+            
+            echo "Creating .env file..."
+            cat > ~/telegram-bot/.env << ENVFILE
+TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+POLLING_INTERVAL=${POLLING_INTERVAL}
+LOG_LEVEL=${LOG_LEVEL}
+ENVFILE
             
             echo "Installing pip if needed..."
             sudo apt-get update
@@ -121,4 +131,4 @@ jobs:
             
             echo "Checking service status..."
             sudo systemctl status telegram-bot --no-pager
-          EOF
+EOF
