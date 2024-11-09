@@ -46,10 +46,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Get Python version from pyproject.toml
+        id: python-version
+        run: |
+          PYTHON_VERSION=$(grep "python = " ./telegram-bot/pyproject.toml | sed 's/python = "\^//' | sed 's/"//')
+          echo "version=$PYTHON_VERSION" >> $GITHUB_OUTPUT
+          
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ steps.python-version.outputs.version }}
           
       - name: Install Poetry
         run: |
@@ -77,6 +83,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           POLLING_INTERVAL: '3.0'
           LOG_LEVEL: 'INFO'
+          PYTHON_VERSION: ${{ steps.python-version.outputs.version }}
         run: |
           # Write the private key to a file
           echo "$PRIVATE_KEY" > private_key.pem
@@ -103,14 +110,17 @@ jobs:
             echo "Creating .env file..."
             echo "TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}\nPOLLING_INTERVAL=${POLLING_INTERVAL}\nLOG_LEVEL=${LOG_LEVEL}" > ~/telegram-bot/.env
             
-            echo "Installing pip if needed..."
-            sudo apt-get update
-            sudo apt-get install -y python3-pip
+            echo "Installing Python ${PYTHON_VERSION}..."
+            sudo apt update
+            sudo apt install -y software-properties-common
+            sudo add-apt-repository -y ppa:deadsnakes/ppa
+            sudo apt update
+            sudo apt install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-venv python${PYTHON_VERSION}-dev python3-pip
             
             echo "Installing dependencies..."
             cd ~/telegram-bot
-            python3 -m pip install --upgrade pip
-            python3 -m pip install -r requirements.txt
+            python${PYTHON_VERSION} -m pip install --upgrade pip
+            python${PYTHON_VERSION} -m pip install -r requirements.txt
             
             if [ ! -f deployment/telegram-bot.service ]; then
               echo "Error: Service file not found!"
@@ -118,7 +128,9 @@ jobs:
             fi
             
             echo "Setting up service..."
-            sudo cp deployment/telegram-bot.service /etc/systemd/system/
+            # Replace PYTHON_VERSION in service file
+            sed "s/\${PYTHON_VERSION}/${PYTHON_VERSION}/g" deployment/telegram-bot.service > deployment/telegram-bot.service.tmp
+            sudo mv deployment/telegram-bot.service.tmp /etc/systemd/system/telegram-bot.service
             
             echo "Starting service..."
             sudo systemctl daemon-reload
