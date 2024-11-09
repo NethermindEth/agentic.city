@@ -110,12 +110,28 @@ jobs:
             echo "Creating .env file..."
             echo "TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}\nPOLLING_INTERVAL=${POLLING_INTERVAL}\nLOG_LEVEL=${LOG_LEVEL}" > ~/telegram-bot/.env
             
-            echo "Installing Python ${PYTHON_VERSION}..."
-            sudo apt update
-            sudo apt install -y software-properties-common
-            sudo add-apt-repository -y ppa:deadsnakes/ppa
-            sudo apt update
-            sudo apt install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-venv python${PYTHON_VERSION}-dev python3-pip
+            echo "Checking for Python ${PYTHON_VERSION}..."
+            if command -v python${PYTHON_VERSION} &> /dev/null; then
+                echo "Python ${PYTHON_VERSION} is already installed"
+            else
+                echo "Installing Python ${PYTHON_VERSION}..."
+                sudo yum update -y
+                sudo yum install -y gcc openssl-devel bzip2-devel libffi-devel wget
+                
+                # Get latest minor version
+                echo "Finding latest Python ${PYTHON_VERSION} version..."
+                LATEST_VERSION=$(wget -qO- https://www.python.org/ftp/python/ | grep -o "${PYTHON_VERSION}.[0-9]*/" | sort -V | tail -n1 | tr -d '/')
+                echo "Latest version: ${LATEST_VERSION}"
+                
+                # Download and install Python
+                cd /tmp
+                wget https://www.python.org/ftp/python/${LATEST_VERSION}/Python-${LATEST_VERSION}.tgz
+                tar xzf Python-${LATEST_VERSION}.tgz
+                cd Python-${LATEST_VERSION}
+                ./configure --enable-optimizations
+                sudo make altinstall
+                cd ~
+            fi
             
             echo "Installing dependencies..."
             cd ~/telegram-bot
