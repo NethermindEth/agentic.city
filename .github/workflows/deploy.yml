@@ -102,10 +102,10 @@ jobs:
             
             echo "Creating .env file..."
             cat > ~/telegram-bot/.env << ENVFILE
-TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-POLLING_INTERVAL=${POLLING_INTERVAL}
-LOG_LEVEL=${LOG_LEVEL}
-ENVFILE
+              TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+              POLLING_INTERVAL=${POLLING_INTERVAL}
+              LOG_LEVEL=${LOG_LEVEL}
+            ENVFILE
             
             echo "Installing pip if needed..."
             sudo apt-get update
