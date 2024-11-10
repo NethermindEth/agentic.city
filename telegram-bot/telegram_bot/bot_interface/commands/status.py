@@ -5,8 +5,11 @@ from telegram.ext import ContextTypes
 MESSAGE_RATE_LIMIT = 5
 RATE_LIMIT_PERIOD = 60
 
-async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler for /status command"""
+    if update.message is None:
+        return
+        
     await update.message.reply_text(
         'Bot Status:\n'
         '✅ Bot is running\n'

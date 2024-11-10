@@ -12,7 +12,7 @@ class Config:
     POLLING_INTERVAL: Final[float] = float(os.environ.get('POLLING_INTERVAL', '3.0'))
     LOG_LEVEL: Final[str] = os.environ.get('LOG_LEVEL', 'INFO')
 
-    def validate(self):
+    def validate(self) -> None:
         if not self.TELEGRAM_BOT_TOKEN:
             raise ValueError("TELEGRAM_BOT_TOKEN environment variable is not set!")
 

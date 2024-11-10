@@ -67,7 +67,9 @@ jobs:
         
       - name: Run tests
         working-directory: ./telegram-bot
-        run: poetry run pytest
+        run: |
+          poetry run mypy telegram_bot/
+          poetry run pytest
         
       - name: Build deployment package
         working-directory: ./telegram-bot

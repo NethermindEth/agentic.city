@@ -28,7 +28,7 @@ def check_rate_limit(user_id: int) -> bool:
     user_message_counts[user_id].append(current_time)
     return True
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler for text messages"""
     if not update.message or not update.effective_user:
         return
@@ -43,6 +43,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     message_type: str = update.message.chat.type
+    # Add null check for text
+    if not update.message.text:
+        await update.message.reply_text("Please send a text message.")
+        return
+        
     text: str = update.message.text
     
     logger.info(f'User ({user_id}) in {message_type}: "{text}"')

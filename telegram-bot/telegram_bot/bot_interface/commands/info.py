@@ -1,8 +1,11 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 
-async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler for /info command"""
+    if update.message is None or update.effective_user is None or update.effective_chat is None:
+        return
+        
     user = update.effective_user
     chat = update.effective_chat
     

@@ -30,4 +30,7 @@ var/
 .idea/
 .vscode/
 *.swp
-*.swo 
+*.swo
+
+# Mypy
+.mypy_cache/
