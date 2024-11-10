@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
-User=ubuntu
-WorkingDirectory=/home/ubuntu/telegram-bot
+User=ec2-user
+WorkingDirectory=/home/ec2-user/telegram-bot
 ExecStart=/usr/bin/python3.9 -m telegram_bot.main
 Restart=always
 RestartSec=3

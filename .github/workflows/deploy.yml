@@ -107,7 +107,9 @@ jobs:
             rm ~/deployment.zip
             
             echo "Creating .env file..."
-            echo "TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}\nPOLLING_INTERVAL=${POLLING_INTERVAL}\nLOG_LEVEL=${LOG_LEVEL}" > ~/telegram-bot/.env
+            echo "TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}" > ~/telegram-bot/.env
+            echo "POLLING_INTERVAL=${POLLING_INTERVAL}" >> ~/telegram-bot/.env
+            echo "LOG_LEVEL=${LOG_LEVEL}" >> ~/telegram-bot/.env
             
             echo "Installing dependencies..."
             cd ~/telegram-bot
