@@ -111,8 +111,8 @@ jobs:
             
             echo "Installing dependencies..."
             cd ~/telegram-bot
-            python3.12 -m pip install --upgrade pip
-            python3.12 -m pip install -r requirements.txt
+            python3.9 -m pip install --upgrade pip
+            python3.9 -m pip install -r requirements.txt
             
             if [ ! -f deployment/telegram-bot.service ]; then
               echo "Error: Service file not found!"

@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/telegram-bot
-ExecStart=/usr/bin/python3.12 -m telegram_bot.main
+ExecStart=/usr/bin/python3.9 -m telegram_bot.main
 Restart=always
 RestartSec=3
 
