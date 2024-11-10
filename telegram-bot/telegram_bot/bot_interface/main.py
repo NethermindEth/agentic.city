@@ -14,6 +14,8 @@ from .commands.info import info_command
 from .handlers.message_handler import handle_message
 from .handlers.error_handler import error_handler
 
+from telegram_bot.agents.basic import agent
+
 logger = logging.getLogger(__name__)
 
 def create_bot() -> Application:
