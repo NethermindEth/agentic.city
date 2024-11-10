@@ -1,4 +1,5 @@
 from typing import Optional
+import uuid
 from swarmer.instructions.instruction import Instruction
 from swarmer.tools.utils import function_to_schema, tool
 from swarmer.types import AgentIdentity, Context, Tool
@@ -18,15 +19,27 @@ class InstructionContext(Context):
     instruction_set: dict[str, Instruction] = {}
 
     def __init__(self) -> None:
+        self.tools.append(self.create_instruction)
+        self.id = uuid.uuid4()
         super().__init__()
 
     def get_context_instructions(self, agent: AgentIdentity) -> Optional[str]:
-        return self.instruction
+        return f"""
+        As the assistant you have the ability to create and switch between different
+        top level instructions that the user defines. If the user indicates that
+        they want a very different mode of operation from the assistant the assistant
+        can prompt them to create a new instruction. The instruction must describe the
+        assistant's expected behavior and responsibilities. The instruction is the core of
+        the assistant's functionality. You can switch between instructions using the
+        provided functions. Instructions are also useful when you are asked to take on
+        complex behavior. If it is unclear to you what the user is looking for from the
+        new mode the assistant can ask the user clarifying questions. Only mention
+        Instructions and modes of operation if the conversation is close to this topic.
+        """
 
     def get_context(self, agent: AgentIdentity) -> Optional[str]:
         return None
 
-    @tool
     def set_active_instruction(agent_identity: AgentIdentity, instruction_id: str) -> None:
         """Set the active instruction by ID."""
         agent = agent_registry.get_agent(agent_identity)

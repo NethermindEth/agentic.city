@@ -33,7 +33,7 @@ class Agent(AgentBase):
     # -----
     def register_tool(self, tool: Tool) -> None:
         """Register a tool with the agent."""
-        self.tools[tool.name] = tool
+        self.tools[tool.__name__] = tool
 
     def unregister_tool(self, tool_name: str) -> None:
         """Unregister a tool from the agent."""
@@ -44,11 +44,11 @@ class Agent(AgentBase):
     # -----
     def register_context(self, context: Context) -> None:
         """Register a context with the agent."""
-        self.context[context.id] = context
+        self.contexts[context.id] = context
     
     def unregister_context(self, context_id: str) -> None:
         """Unregister a context from the agent."""
-        self.context.pop(context_id)
+        self.contexts.pop(context_id)
 
     # -----
     # Run
@@ -108,12 +108,12 @@ class Agent(AgentBase):
 
     def get_context_instructions(self) -> list[str]:
         """Get the context instructions for the agent."""
-        instructions = [context.get_context_instructions() for context in self.contexts.values()]
+        instructions = [context.get_context_instructions(self.identity) for context in self.contexts.values()]
         return list(filter(lambda x: x is not None, instructions))
 
     def get_context(self) -> list[str]:
         """Get the context for the agent."""
-        contexts = [context.get_context() for context in self.contexts.values()]
+        contexts = [context.get_context(self.identity) for context in self.contexts.values()]
         return list(filter(lambda x: x is not None, contexts))
 
 

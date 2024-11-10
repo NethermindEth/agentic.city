@@ -75,10 +75,10 @@ def tool(func: Callable[[AgentIdentity, *tuple[Any, ...]], Any]) -> Tool:
     # Copy over function metadata
     wrapper.__doc__ = func.__doc__
     wrapper.__annotations__ = func.__annotations__
-    wrapper.id = property(lambda _: hashlib.sha256(inspect.getsource(func).encode()).hexdigest())
+    wrapper.id = hashlib.sha256(inspect.getsource(func).encode()).hexdigest()
 
     # Append the id to the name to make it unique
     wrapper.__name__ = func.__name__ + wrapper.id[:16]
-    wrapper.schema = property(lambda _: _function_to_schema(func, wrapper.__name__))
+    wrapper.schema = _function_to_schema(func, wrapper.__name__)
 
     return wrapper
