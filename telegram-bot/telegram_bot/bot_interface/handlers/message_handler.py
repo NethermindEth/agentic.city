@@ -6,6 +6,8 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.error import TelegramError
 
+from telegram_bot.agents.basic import agent
+
 logger = logging.getLogger(__name__)
 
 # Rate limiting
@@ -53,8 +55,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     logger.info(f'User ({user_id}) in {message_type}: "{text}"')
     
     try:
-        response: str = f"Echo: {text}"
-        await update.message.reply_text(response)
+        messages = agent.run_loop(text)
+        
+        for message in messages:
+            print(message)
+            if message.role == "assistant" and message.content:
+                await update.message.reply_text(message.content)
+            elif message.role == "tool":
+                # Format tool response nicely
+                tool_response = f"🔧 Tool Result:\n{message.content}"
+                await update.message.reply_text(tool_response)
+                
     except TelegramError as e:
         logger.error(f"Error sending message: {e}")
         await update.message.reply_text("Sorry, I encountered an error processing your message.") 

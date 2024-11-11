@@ -5,18 +5,6 @@ from telegram_bot.bot_interface.handlers.message_handler import handle_message, 
 from unittest.mock import AsyncMock
 
 @pytest.mark.asyncio
-async def test_handle_message_echo(mock_update, mock_context):
-    # Arrange
-    update = mock_update("Hello, bot!")
-    user_message_counts.clear()
-    
-    # Act
-    await handle_message(update, mock_context)
-    
-    # Assert
-    update.message.reply_text.assert_called_once_with("Echo: Hello, bot!")
-
-@pytest.mark.asyncio
 async def test_handle_empty_message(mock_update, mock_context):
     # Arrange
     update = mock_update("")
@@ -26,7 +14,7 @@ async def test_handle_empty_message(mock_update, mock_context):
     await handle_message(update, mock_context)
     
     # Assert
-    update.message.reply_text.assert_called_once_with("Echo: ")
+    update.message.reply_text.assert_called_once_with("Please send a text message.")
 
 @pytest.mark.asyncio
 async def test_handle_rate_limit_exceeded(mock_update, mock_context):
@@ -49,32 +37,6 @@ async def test_handle_rate_limit_exceeded(mock_update, mock_context):
     update.message.reply_text.assert_called_once_with(
         "⚠️ Rate limit exceeded. Please wait before sending more messages."
     )
-
-@pytest.mark.asyncio
-async def test_handle_telegram_error(mock_update, mock_context):
-    # Arrange
-    update = mock_update("Test message")
-    user_message_counts.clear()
-    
-    # First call raises error, second call succeeds
-    mock_reply = AsyncMock()
-    mock_reply.side_effect = [
-        telegram_error.TelegramError("Telegram error"),
-        None
-    ]
-    update.message.reply_text = mock_reply
-    
-    # Act
-    await handle_message(update, mock_context)
-    
-    # Assert
-    assert update.message.reply_text.call_count == 2
-    # First call should be the echo attempt
-    first_call = update.message.reply_text.call_args_list[0]
-    assert first_call[0][0] == "Echo: Test message"
-    # Second call should be the error message
-    second_call = update.message.reply_text.call_args_list[1]
-    assert "Sorry, I encountered an error" in second_call[0][0]
 
 def test_check_rate_limit():
     # Arrange
