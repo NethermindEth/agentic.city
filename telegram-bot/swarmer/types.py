@@ -39,11 +39,37 @@ class InstructionBase(ABC):
         pass
 
 class Tool(Callable[[AgentIdentity, *tuple[Any, ...]], Any]):
-    """Represents a tool or function that an agent can use.
+    """Represents a function that an agent can use to affect its environment.
+    
+    Tools are the primary way agents interact with the world outside their
+    conversation context. Each tool has a schema describing its interface
+    and a unique identifier for versioning.
+
+    Important:
+        The first parameter of every tool MUST be agent_identity: AgentIdentity.
+        This parameter identifies which agent invoked the tool and enables
+        agent-specific behavior.
+
+    Tools should:
+    1. Be atomic - do one thing well
+    2. Be stateless when possible
+    3. Handle errors gracefully
+    4. Have clear documentation
+    5. Include proper type hints
+    6. Always accept agent_identity as first parameter
+
+    Example:
+        @tool
+        def my_tool(agent_identity: AgentIdentity, param1: str) -> str:
+            agent = agent_registry.get_agent(agent_identity)
+            return f"Performed action for {agent.identity.name}"
 
     Attributes:
-        schema (str): JSON schema for the tool's input and output in OpenAI's format (json_schema)
-        id (str): hash of the tool's source code TODO (vulnerability): this is not secure, we would need to hash all dependencies or rely on nix. But this will work for now.
+        schema (str): JSON schema describing the tool interface in OpenAI format
+        id (str): Unique identifier (hash of source code)
+        __name__ (str): The function name used in schemas
+        __doc__ (str): Documentation string used in schemas
+        __annotations__ (dict): Type hints used for schema generation
     """
     schema: str
     id: str
