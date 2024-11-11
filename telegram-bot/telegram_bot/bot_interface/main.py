@@ -11,6 +11,7 @@ from .commands.start import start_command
 from .commands.help import help_command
 from .commands.status import status_command
 from .commands.info import info_command
+from .commands.usage import usage_command
 from .handlers.message_handler import handle_message
 from .handlers.error_handler import error_handler
 
@@ -37,6 +38,7 @@ def create_bot() -> Application:
     app.add_handler(CommandHandler('help', help_command))
     app.add_handler(CommandHandler('status', status_command))
     app.add_handler(CommandHandler('info', info_command))
+    app.add_handler(CommandHandler('usage', usage_command))
     
     # Add message handler
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))

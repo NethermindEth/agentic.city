@@ -11,5 +11,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         '/start - Start the bot\n'
         '/help - Show this help message\n'
         '/status - Check bot status\n'
-        '/info - Get information about yourself'
+        '/info - Get information about yourself\n'
+        '/usage - View token usage statistics'
     ) 

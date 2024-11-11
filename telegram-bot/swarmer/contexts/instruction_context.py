@@ -19,7 +19,7 @@ class InstructionContext(Context):
     instruction_set: dict[str, Instruction] = {}
 
     def __init__(self) -> None:
-        self.tools.append(self.create_instruction)
+        self.tools.append(InstructionContext.create_instruction)
         self.id = uuid.uuid4()
         super().__init__()
 
@@ -68,6 +68,7 @@ class InstructionContext(Context):
         The instruction will be registered with a unique ID generated from its name and content.
         This ID is used internally to reference and switch between instructions.
         """
+
         agent = agent_registry.get_agent(agent_identity)
         instruction = Instruction(instruction, description, name)
 
@@ -77,11 +78,13 @@ class InstructionContext(Context):
         def wrapper(agent_identity: AgentIdentity):
             InstructionContext.set_active_instruction(agent_identity, instruction.id)
 
-        wrapper.__name__ = f"switch_to_{instruction.name}_mode"
+        wrapper.__name__ = f"switch_to_{instruction.name}{instruction.id[:16]}_mode"
         wrapper.__doc__ = f"Switch the agent to {instruction.name} mode. Only one switch function can be called at a time and it must be the last call in the sequence."
-        wrapper.schema = function_to_schema(wrapper)
+        wrapper.schema = function_to_schema(wrapper, wrapper.__name__)
         # In this case we inherit the instruction id as the tool id
         wrapper.id = instruction.id
 
 
         agent.register_tool(wrapper)
+
+        return f"Created instruction with switch function name: {wrapper.__name__}"

@@ -26,7 +26,7 @@ def _function_to_schema(func, name) -> dict:
         )
 
     parameters = {}
-    for param in signature.parameters.values():
+    for param in list(signature.parameters.values())[1:]:
         try:
             param_type = type_map.get(param.annotation, "string")
         except KeyError as e:
@@ -37,7 +37,7 @@ def _function_to_schema(func, name) -> dict:
 
     required = [
         param.name
-        for param in signature.parameters.values()
+        for param in list(signature.parameters.values())[1:]
         if param.default == inspect._empty
     ]
 
@@ -54,10 +54,10 @@ def _function_to_schema(func, name) -> dict:
         },
     }
 
-def function_to_schema(func) -> str:
-    return json.dumps(_function_to_schema(func), indent=2)
+def function_to_schema(func, name) -> str:
+    return json.dumps(_function_to_schema(func, name), indent=2)
 
-def tool(func: Callable[[AgentIdentity, *tuple[Any, ...]], Any]) -> Tool:
+def tool(func: Callable[[AgentIdentity, *tuple[Any, ...]], str]) -> Tool:
     """Decorator that adds a schema property to a function based on its type hints.
     
     The schema property contains the OpenAI function calling schema for the decorated function.

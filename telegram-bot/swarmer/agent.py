@@ -1,10 +1,12 @@
 import json
 from swarmer.types import AgentBase, AgentIdentity, Context, Tool
 from swarmer.tools.utils import function_to_schema, tool
-from typing import Optional, List
+from typing import Optional, List, Dict
 from swarmer.globals.consitution import constitution
 from litellm import Message, completion
 import uuid
+import inspect
+from litellm.utils import token_counter
 
 class Agent(AgentBase):
     def __init__(
@@ -18,15 +20,20 @@ class Agent(AgentBase):
         
         Args:
             name: The display name of the agent
-            instruction: Initial instruction for the agent
             token_budget: Maximum tokens the agent can use
+            model: The model to use for completions
         """
         self.identity = AgentIdentity(name=name, uuid=str(uuid.uuid4()))
-        self.contexts: dict[str, Context] = {}  # dictionary of available contexts
-        self.tools: dict[str, Tool] = {}    # dictionary of available tools
+        self.contexts: dict[str, Context] = {}
+        self.tools: dict[str, Tool] = {}
         self.token_budget = token_budget
-        self.message_log: list[Message] = [] # Message history
+        self.message_log: list[Message] = []
         self.model = model
+        self.token_usage: Dict[str, int] = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0
+        }
 
     # -----
     # Tools
@@ -67,11 +74,18 @@ class Agent(AgentBase):
         context_message = Message(role="system", content=
                                   f"Current context:\n\n{"\n\n".join(self.get_context())}"
                                 )
+
         response = completion(
             model=self.model,
             messages=[system_message, *self.message_log, context_message, user_message],
             tools=self.get_tool_schemas(),
         )
+
+        # Add token tracking
+        if response.usage:
+            self.token_usage["prompt_tokens"] += response.usage.prompt_tokens
+            self.token_usage["completion_tokens"] += response.usage.completion_tokens
+            self.token_usage["total_tokens"] += response.usage.total_tokens
 
         message = response.choices[0].message
 
@@ -82,7 +96,7 @@ class Agent(AgentBase):
             tool_results= []
             for tool_call in message.tool_calls:
                 tool_result = self.execute_tool_call(tool_call)
-                tool_result_message = Message(role="tool", content=tool_result)
+                tool_result_message = Message(role="tool", content=tool_result, tool_call_id=tool_call.id)
                 response_history.append(tool_result_message)
 
             context_message = Message(role="system", content=
@@ -92,7 +106,7 @@ class Agent(AgentBase):
             response = completion(
                 model=self.model,
                 messages=[system_message, *self.message_log, user_message, context_message, *response_history],
-                tools=self.get_tool_schemas(),
+                # tools=self.get_tool_schemas(),
             )
             message = response.choices[0].message
             response_history.append(message)
@@ -103,8 +117,8 @@ class Agent(AgentBase):
     def execute_tool_call(self, tool_call):
         name = tool_call.function.name
         args = json.loads(tool_call.function.arguments)
-
-        return self.tools[name](**args)
+        
+        return self.tools[name](self.identity, **args)
 
     def get_context_instructions(self) -> list[str]:
         """Get the context instructions for the agent."""
@@ -120,3 +134,7 @@ class Agent(AgentBase):
     def get_tool_schemas(self) -> Optional[list[Tool]]:
         """Get the tool schemas for the agent."""
         return [tool.schema for tool in self.tools.values()] if self.tools else None
+
+    def get_token_usage(self) -> Dict[str, int]:
+        """Get the current token usage statistics."""
+        return self.token_usage
