@@ -1,12 +1,9 @@
 import json
 from swarmer.types import AgentBase, AgentIdentity, Context, Tool
-from swarmer.tools.utils import function_to_schema, tool
 from typing import Optional, List, Dict
 from swarmer.globals.consitution import constitution
 from litellm import Message, completion
 import uuid
-import inspect
-from litellm.utils import token_counter
 
 class Agent(AgentBase):
     def __init__(
