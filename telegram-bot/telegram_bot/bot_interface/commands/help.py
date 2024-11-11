@@ -13,5 +13,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         '/status - Check bot status\n'
         '/info - Get information about yourself\n'
         '/usage - View token usage statistics\n'
-        '/dump - Dump complete agent state'
+        '/dump - Dump complete agent state\n'
+        '/remove_agent <user_id> - Remove an agent for a specific user'
     ) 

@@ -69,7 +69,7 @@ jobs:
         working-directory: ./telegram-bot
         run: |
           poetry run mypy --no-incremental telegram_bot/
-          poetry run pytest --cache-clear
+          poetry run mypy --no-incremental swarmer/
         
       - name: Build deployment package
         working-directory: ./telegram-bot

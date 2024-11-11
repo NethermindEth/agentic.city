@@ -1,12 +1,13 @@
 from telegram import Update
 from telegram.ext import ContextTypes
-from telegram_bot.agents.basic import agent
+from telegram_bot.agents.agent_manager import agent_manager
 
 async def usage_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler for /usage command"""
-    if update.message is None:
+    if not update.message or not update.effective_user:
         return
 
+    agent = agent_manager.get_or_create_agent(update.effective_user.id)
     usage = agent.get_token_usage()
     
     usage_message = (

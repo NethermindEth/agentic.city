@@ -1,6 +1,7 @@
 from typing import Optional, cast
 import uuid
-from swarmer.instructions.instruction import Persona  # Renamed from Instruction
+import hashlib
+from swarmer.instructions.instruction import Persona
 from swarmer.tools.utils import function_to_schema, tool
 from swarmer.types import AgentIdentity, Context, Tool
 from swarmer.globals.agent_registry import agent_registry
@@ -18,8 +19,7 @@ class PersonaContext(Context):
     def __init__(self) -> None:
         self.tools: list[Tool] = []
         self.agent_persona: dict[str, Persona] = {}
-        self.persona_collection: dict[str, Persona] = {}  # Changed from instruction_set
-
+        self.persona_collection: dict[str, Persona] = {}
         self.tools.append(self.create_persona)
         self.id = str(uuid.uuid4())
 
@@ -54,6 +54,11 @@ class PersonaContext(Context):
     def get_active_persona(self, agent_identity: AgentIdentity) -> Optional[Persona]:
         return self.agent_persona.get(agent_identity.id)
 
+    def persona_switch_tool(self, agent_identity: AgentIdentity, persona_id: str) -> str:
+        """Class-level method for persona switching"""
+        self.set_active_persona(agent_identity, persona_id)
+        return f"Now acting as {self.persona_collection[persona_id].name}"
+
     @tool
     def create_persona(self, agent_identity: AgentIdentity, persona: str, description: str, name: str) -> str:
         """Register a new persona with the agent.
@@ -87,5 +92,49 @@ class PersonaContext(Context):
         wrapper.__tool_schema__ = function_to_schema(wrapper, wrapper.__name__)
 
         agent.register_tool(wrapper)
+        return f"Created persona with switch function name: {wrapper.__name__}"
 
-        return f"Created persona with switch function name: {wrapper.__name__}" 
+    def serialize(self) -> dict:
+        """Serialize context state"""
+        return {
+            "id": self.id,
+            "agent_persona": {
+                agent_id: {
+                    "instruction": persona.instruction,
+                    "description": persona.description,
+                    "name": persona.name
+                }
+                for agent_id, persona in self.agent_persona.items()
+            },
+            "persona_collection": {
+                persona_id: {
+                    "instruction": persona.instruction,
+                    "description": persona.description,
+                    "name": persona.name
+                }
+                for persona_id, persona in self.persona_collection.items()
+            }
+        }
+
+    def deserialize(self, state: dict, agent_identity: AgentIdentity) -> None:
+        """Load state into this context instance"""
+        self.id = state["id"]
+        
+        # Restore personas
+        self.persona_collection = {
+            persona_id: Persona(**persona_data)
+            for persona_id, persona_data in state["persona_collection"].items()
+        }
+        self.agent_persona = {
+            agent_id: Persona(**persona_data)
+            for agent_id, persona_data in state["agent_persona"].items()
+        }
+        
+        # Recreate switch tools for each persona
+        for persona in self.persona_collection.values():
+            self.create_persona(
+                agent_identity=agent_identity,
+                persona=persona.instruction,
+                description=persona.description,
+                name=persona.name
+            )

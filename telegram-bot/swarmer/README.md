@@ -30,6 +30,15 @@ Available contexts include:
 - Contexts provide specialized tool sets
 - Parallel tool execution support
 
+### 💾 State Persistence
+- JSON-based serialization system
+- Each context handles its own state
+- Tools are recreated on load
+- Human-readable state files
+- Automatic state saving
+
+[Learn more about serialization](./docs/serialization.md)
+
 ### 📡 Event Handling
 - Cron-like scheduled operations
 - Data stream subscriptions
@@ -47,14 +56,27 @@ export OPENAI_API_KEY=your_key_here
 ```python
 from swarmer.agent import Agent
 from swarmer.contexts.persona_context import PersonaContext
+from swarmer.contexts.memory_context import MemoryContext
 
 # Create agent
 agent = Agent("Assistant", token_budget=1000000, model="gpt-4")
 
-# Add persona context
-persona_context = PersonaContext()
-agent.register_context(persona_context)
+# Add contexts
+agent.register_context(PersonaContext())
+agent.register_context(MemoryContext())
 
 # Run agent
 response = agent.run_loop("Hello!")
+
+# Save state
+Agent.save_state(agent, "agent_state.json")
+
+# Load state
+agent = Agent.load_state("agent_state.json")
 ```
+
+## Documentation
+- [Message Flow](./docs/message_flow.md)
+- [Contexts](./contexts/README.md)
+- [Tools](./docs/tools.md)
+- [Serialization](./docs/serialization.md)
