@@ -106,7 +106,7 @@ class Agent(AgentBase):
             response = completion(
                 model=self.model,
                 messages=[system_message, *self.message_log, user_message, context_message, *response_history],
-                # tools=self.get_tool_schemas(),
+                tools=self.get_tool_schemas(),
             )
             message = response.choices[0].message
             response_history.append(message)

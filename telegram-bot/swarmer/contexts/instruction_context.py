@@ -43,8 +43,8 @@ class InstructionContext(Context):
     def set_active_instruction(agent_identity: AgentIdentity, instruction_id: str) -> None:
         """Set the active instruction by ID."""
         agent = agent_registry.get_agent(agent_identity)
-        if instruction_id in agent.instruction_set:
-            agent.instruction = agent.instruction_set[instruction_id]
+        if instruction_id in InstructionContext.instruction_set:
+            agent.instruction = InstructionContext.instruction_set[instruction_id]
         else:
             raise ValueError(f"No instruction found with id: {instruction_id}")
 
@@ -75,8 +75,9 @@ class InstructionContext(Context):
         # Register instruction
         InstructionContext.instruction_set[instruction.id] = instruction
 
-        def wrapper(agent_identity: AgentIdentity):
+        def wrapper(agent_identity: AgentIdentity) -> str:
             InstructionContext.set_active_instruction(agent_identity, instruction.id)
+            return f"Switched to {instruction.name} mode"
 
         wrapper.__name__ = f"switch_to_{instruction.name}{instruction.id[:16]}_mode"
         wrapper.__doc__ = f"Switch the agent to {instruction.name} mode. Only one switch function can be called at a time and it must be the last call in the sequence."
