@@ -46,22 +46,14 @@ Tools are functions that agents can use to interact with their environment and p
        tools: list[Tool] = []
        
        def __init__(self) -> None:
-           # INCORRECT - Don't use self.my_tool
-           # self.tools.append(self.my_tool)  # This binds context as first param!
-           
-           # CORRECT - Use the static class method
-           self.tools.append(MyContext.my_tool)
+           self.tools.append(self.my_tool)
            self.id = uuid.uuid4()
 
        @tool
-       def my_tool(agent_identity: AgentIdentity, arg1: str) -> str:
+       def my_tool(self, agent_identity: AgentIdentity, arg1: str) -> str:
            """Tool implementation"""
            pass
    ```
-
-   **Important**: Tools must be registered using their static class method version (MyContext.my_tool), 
-   not the instance method version (self.my_tool). Using self.my_tool will incorrectly bind the 
-   context instance as the first parameter instead of agent_identity.
 
 2. **Agent Level**
    ```python

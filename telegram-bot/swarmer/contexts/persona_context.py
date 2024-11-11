@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, cast
 import uuid
 from swarmer.instructions.instruction import Persona  # Renamed from Instruction
 from swarmer.tools.utils import function_to_schema, tool
@@ -14,15 +14,14 @@ class PersonaContext(Context):
 
     The persona context is fundamental to enabling dynamic personality changes while
     maintaining proper encapsulation of behavioral state."""
-    
-    tools: list[Tool] = []
-    agent_persona: dict[str, Persona] = {}
-    persona_collection: dict[str, Persona] = {}  # Changed from instruction_set
 
     def __init__(self) -> None:
-        self.tools.append(PersonaContext.create_persona)
-        self.id = uuid.uuid4()
-        super().__init__()
+        self.tools: list[Tool] = []
+        self.agent_persona: dict[str, Persona] = {}
+        self.persona_collection: dict[str, Persona] = {}  # Changed from instruction_set
+
+        self.tools.append(self.create_persona)
+        self.id = str(uuid.uuid4())
 
     def get_context_instructions(self, agent: AgentIdentity) -> Optional[str]:
         return f"""
@@ -37,21 +36,26 @@ class PersonaContext(Context):
         what kind of persona the user is looking for, you can ask clarifying questions.
         Only mention personas if the conversation naturally leads to discussing
         different ways of interaction.
+
+        The current active persona is:
+        {self.get_active_persona(agent)}
         """
 
     def get_context(self, agent: AgentIdentity) -> Optional[str]:
         return None
 
-    def set_active_persona(agent_identity: AgentIdentity, persona_id: str) -> None:
+    def set_active_persona(self, agent_identity: AgentIdentity, persona_id: str) -> None:
         """Set the active persona by ID."""
-        agent = agent_registry.get_agent(agent_identity)
-        if persona_id in PersonaContext.persona_collection:
-            agent.persona = PersonaContext.persona_collection[persona_id]
+        if persona_id in self.persona_collection:
+            self.agent_persona[agent_identity.id] = self.persona_collection[persona_id]
         else:
             raise ValueError(f"No persona found with id: {persona_id}")
 
+    def get_active_persona(self, agent_identity: AgentIdentity) -> Optional[Persona]:
+        return self.agent_persona.get(agent_identity.id)
+
     @tool
-    def create_persona(agent_identity: AgentIdentity, persona: str, description: str, name: str) -> None:
+    def create_persona(self, agent_identity: AgentIdentity, persona: str, description: str, name: str) -> str:
         """Register a new persona with the agent.
         
         A persona defines a specific personality and role for the agent through a system prompt.
@@ -68,19 +72,19 @@ class PersonaContext(Context):
         This ID is used internally to reference and switch between personas.
         """
         agent = agent_registry.get_agent(agent_identity)
-        persona = Persona(persona, description, name)
+        persona_obj = Persona(persona, description, name)
 
         # Register persona
-        PersonaContext.persona_collection[persona.id] = persona
+        self.persona_collection[persona_obj.id] = persona_obj
 
-        def wrapper(agent_identity: AgentIdentity) -> str:
-            PersonaContext.set_active_persona(agent_identity, persona.id)
-            return f"Now acting as {persona.name}"
+        def _wrapper(agent_identity: AgentIdentity) -> str:
+            self.set_active_persona(agent_identity, persona_obj.id)
+            return f"Now acting as {persona_obj.name}"
 
-        wrapper.__name__ = f"become_{persona.name}{persona.id[:16]}"
-        wrapper.__doc__ = f"Switch to the {persona.name} persona. Only one persona switch can be called at a time and it must be the last call in the sequence."
-        wrapper.schema = function_to_schema(wrapper, wrapper.__name__)
-        wrapper.id = persona.id
+        wrapper = cast(Tool, _wrapper)
+        wrapper.__name__ = f"become_{persona_obj.name}_{persona_obj.id[:16]}"
+        wrapper.__doc__ = f"Switch to the {persona_obj.name} persona. Only one persona switch can be called at a time and it must be the last call in the sequence."
+        wrapper.__tool_schema__ = function_to_schema(wrapper, wrapper.__name__)
 
         agent.register_tool(wrapper)
 

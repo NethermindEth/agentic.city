@@ -1,8 +1,8 @@
 import json
-from swarmer.types import AgentBase, AgentIdentity, Context, Tool
-from typing import Optional, List, Dict
+from swarmer.types import AgentBase, AgentIdentity, Context, Tool, Message
+from typing import Any, Optional, List, Dict, cast
 from swarmer.globals.consitution import constitution
-from litellm import Message, completion
+from litellm import completion
 import uuid
 from swarmer.debug_ui.server import DebugUIServer
 
@@ -23,7 +23,7 @@ class Agent(AgentBase):
             model: The model to use for completions
             debug_ui: Whether to start the debug UI server
         """
-        self.identity = AgentIdentity(name=name, uuid=str(uuid.uuid4()))
+        self.identity = AgentIdentity(name=name, id=str(uuid.uuid4()))
         self.contexts: dict[str, Context] = {}
         self.tools: dict[str, Tool] = {}
         self.token_budget = token_budget
@@ -56,6 +56,9 @@ class Agent(AgentBase):
     def register_context(self, context: Context) -> None:
         """Register a context with the agent."""
         self.contexts[context.id] = context
+        # Register tools
+        for tool in context.tools:
+            self.register_tool(tool)
     
     def unregister_context(self, context_id: str) -> None:
         """Unregister a context from the agent."""
@@ -68,16 +71,18 @@ class Agent(AgentBase):
         """Run the agent loop."""
         user_message = Message(role="user", content=user_input)
 
-        system_message = Message(role="system", content=
-                            "\n\n".join([
-                                constitution.instruction,
-                                *self.get_context_instructions()
-                            ])
-                        )
+        system_message = Message(
+            role="system",
+            content="\n\n".join([
+                constitution.instruction,
+                *self.get_context_instructions()
+            ])
+        )
 
-        context_message = Message(role="system", content=
-                                  f"Current context:\n\n{"\n\n".join(self.get_context())}"
-                                )
+        context_message = Message(
+            role="system", 
+            content=f"Current context:\n\n{"\n\n".join(self.get_context())}"
+        )
 
         response = completion(
             model=self.model,
@@ -97,14 +102,15 @@ class Agent(AgentBase):
 
         while response.choices[0].finish_reason == "tool_calls":
             # TODO: handle in parallel
-            tool_results= []
             for tool_call in message.tool_calls:
+                print(f"tool_call: {tool_call}")
                 tool_result = self.execute_tool_call(tool_call)
                 tool_result_message = Message(role="tool", content=tool_result, tool_call_id=tool_call.id)
                 response_history.append(tool_result_message)
 
-            context_message = Message(role="system", content=
-                f"Current context:\n\n{"\n\n".join(self.get_context())}"
+            context_message = Message(
+                role="system", 
+                content=f"Current context:\n\n{"\n\n".join(self.get_context())}"
             )
  
             response = completion(
@@ -118,29 +124,30 @@ class Agent(AgentBase):
         self.message_log += [user_message, *response_history]
         return response_history
 
-    def execute_tool_call(self, tool_call):
+    # TODO fix the tool_call type
+    def execute_tool_call(self, tool_call: Any) -> str:
         """Execute a tool call and return a formatted result string"""
         name = tool_call.function.name
         args = json.loads(tool_call.function.arguments)
         
         result = self.tools[name](self.identity, **args)
-        
-        return result
+        return str(result)
 
     def get_context_instructions(self) -> list[str]:
         """Get the context instructions for the agent."""
         instructions = [context.get_context_instructions(self.identity) for context in self.contexts.values()]
-        return list(filter(lambda x: x is not None, instructions))
+        return [x for x in instructions if x is not None]
 
     def get_context(self) -> list[str]:
         """Get the context for the agent."""
         contexts = [context.get_context(self.identity) for context in self.contexts.values()]
-        return list(filter(lambda x: x is not None, contexts))
+        return [x for x in contexts if x is not None]
 
 
-    def get_tool_schemas(self) -> Optional[list[Tool]]:
+    def get_tool_schemas(self) -> Optional[List[dict]]:
         """Get the tool schemas for the agent."""
-        return [tool.schema for tool in self.tools.values()] if self.tools else None
+        print([type(tool) for tool in self.tools.values()])
+        return [tool.__tool_schema__ for tool in self.tools.values()] if self.tools else None
 
     def get_token_usage(self) -> Dict[str, int]:
         """Get the current token usage statistics."""

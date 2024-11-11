@@ -58,7 +58,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         messages = agent.run_loop(text)
         
         for message in messages:
-            print(message)
+            print("++++++++++++++", message)
             if message.role == "assistant" and message.content:
                 await update.message.reply_text(message.content)
             elif message.role == "tool":

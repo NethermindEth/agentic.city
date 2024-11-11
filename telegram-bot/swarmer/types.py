@@ -1,7 +1,25 @@
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Literal, Optional, Protocol, List, Dict, Union
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
-from litellm import Message
+from litellm import Message as AnnoyingMessage
+
+class Message(AnnoyingMessage):
+    """Wrapper around litellm.Message to make it compatible with the rest of the codebase."""
+    def __init__(
+        self,
+        content: Optional[str] = None,
+        role: Literal["assistant", "user", "system", "tool", "function"] = "assistant",
+        function_call: Optional[dict] = None,
+        tool_calls: Optional[list] = None,
+        **params: Any,
+    ):
+        super().__init__(
+            content,
+            role, # type: ignore
+            function_call,
+            tool_calls,
+            **params
+        )
 
 @dataclass
 class AgentIdentity:
@@ -9,10 +27,10 @@ class AgentIdentity:
 
     Attributes:
         name (str): The display name of the agent
-        uuid (str): Unique identifier for the agent
+        id (str): Unique identifier for the agent
     """
     name: str
-    uuid: str
+    id: str
 
 class InstructionBase(ABC):
     """Represents a system prompt that defines an agent's behavior and directives.
@@ -20,7 +38,7 @@ class InstructionBase(ABC):
     Agents will follow these instructions precisely. Users can create multiple instructions
     to define different agent behaviors and switch between them.
 
-    Instruciton names should be short and descriptive. To the LLM they will appear as
+    Instruction names should be short and descriptive. To the LLM they will appear as
     switch_to_<name>_mode
 
     Attributes:
@@ -35,10 +53,12 @@ class InstructionBase(ABC):
     id: str
 
     @abstractmethod
-    def __init__(self, instruction: str, description: str) -> None:
+    def __init__(self, instruction: str, description: str, name: str) -> None:
         pass
 
-class Tool(Callable[[AgentIdentity, *tuple[Any, ...]], Any]):
+ToolableType = Callable[..., str]
+
+class Tool(Protocol):
     """Represents a function that an agent can use to affect its environment.
     
     Tools are the primary way agents interact with the world outside their
@@ -65,14 +85,16 @@ class Tool(Callable[[AgentIdentity, *tuple[Any, ...]], Any]):
             return f"Performed action for {agent.identity.name}"
 
     Attributes:
-        schema (str): JSON schema describing the tool interface in OpenAI format
+        schema (dict): JSON schema describing the tool interface in OpenAI format
         id (str): Unique identifier (hash of source code)
         __name__ (str): The function name used in schemas
         __doc__ (str): Documentation string used in schemas
-        __annotations__ (dict): Type hints used for schema generation
+        __call__ (Callable): The wrapped function
     """
-    schema: str
-    id: str
+    __call__: ToolableType
+    __name__: str
+    __tool_doc__: str
+    __tool_schema__: dict
 
 class Context(ABC):
     """A Context represents a dynamic aspect of an agent's operational environment.
@@ -91,7 +113,7 @@ class Context(ABC):
         tools (list[Tool]): Tools this context provides to the agent
     """
     id: str
-    tools: list[Tool]
+    tools: List[Tool]
 
     @abstractmethod
     def __init__(self) -> None:
@@ -136,8 +158,8 @@ class AgentBase(ABC):
 
     Attributes:
         identity (AgentIdentity): The agent's identity information
-        persona (Persona): Current active persona defining behavior
-        persona_collection (dict[str, Persona]): Available personas
+        instruction (InstructionBase): Current active instruction defining behavior
+        instruction_set (dict[str, InstructionBase]): Available instructions
         context (dict[str, Context]): Active contexts providing different capabilities
         tools (dict[str, Tool]): Available tools from all contexts
         token_budget (int): Maximum tokens the agent can use
@@ -145,18 +167,76 @@ class AgentBase(ABC):
         _history (list[Message]): Conversation history
     """
     identity: AgentIdentity
-    # TODO: model instructions as a context
-    instruction: InstructionBase
-    instruction_set: dict[str, InstructionBase]
-    context: dict[str, Context]
-    tools: dict[str, Tool]
+    contexts: Dict[str, Context]
+    tools: Dict[str, Tool]
     token_budget: int
     model: str
-    _history: list[Message]
+    _history: List[Message]
 
     @abstractmethod
     def __init__(self) -> None:
         pass
+
+    @abstractmethod
+    def get_context_instructions(self) -> list[str]:
+        """Get the context instructions for the agent.
+        
+        Returns a list of instruction strings from all registered contexts that help guide
+        the agent's behavior. Each context can provide its own set of instructions on how
+        the agent should interact with its capabilities.
+
+        Returns:
+            list[str]: List of instruction strings from all contexts, excluding None values
+        """
+        pass
+
+    @abstractmethod
+    def get_context(self) -> list[str]:
+        """Get the current context state for the agent.
+        
+        Returns a list of context strings representing the current state of all registered
+        contexts. Each context can provide information about its current state that is
+        relevant for the agent's decision making.
+
+        Returns:
+            list[str]: List of context state strings from all contexts, excluding None values
+        """
+        pass
+
+    @abstractmethod
+    def register_context(self, context: Context) -> None:
+        """Register a context with the agent.
+        
+        This method allows the agent to incorporate a new context, providing it with
+        additional capabilities and behaviors.
+        """
+        pass
+
+    @abstractmethod
+    def unregister_context(self, context_id: str) -> None:
+        """Unregister a context from the agent.
+        
+        This method allows the agent to remove a context, preventing it from being used.
+        """
+        pass
+
+    @abstractmethod
+    def register_tool(self, tool: Tool) -> None:
+        """Register a tool with the agent.
+        
+        This method allows the agent to incorporate a new tool, providing it with
+        additional capabilities.
+        """
+        pass
+
+    @abstractmethod
+    def unregister_tool(self, tool_name: str) -> None:
+        """Unregister a tool from the agent.
+        
+        This method allows the agent to remove a tool, preventing it from being used.
+        """
+        pass
+
 
 @dataclass
 class Constitution:
@@ -172,13 +252,13 @@ class Constitution:
     """
     instruction: str
 
-class AgentRegistry:
+class AgentRegistry(ABC):
     """Registry for managing and accessing agents by their unique identifiers.
     
     Attributes:
         registry (dict[str, AgentBase]): A dictionary mapping agent uuids to their instances
     """
-    registry: dict[str, AgentBase]
+    registry: Dict[str, AgentBase]
 
     @abstractmethod
     def get_agent(self, agent_identity: AgentIdentity) -> AgentBase:

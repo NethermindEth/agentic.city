@@ -1,14 +1,13 @@
 from swarmer.agent import Agent
-from swarmer.contexts.instruction_context import InstructionContext
+from swarmer.contexts.persona_context import PersonaContext
 from swarmer.globals.agent_registry import agent_registry
 
 agent = Agent("Basic", token_budget=1000000, model="gpt-4o")
-agent_registry.registry[agent.identity.uuid] = agent
+agent_registry.registry[agent.identity.id] = agent
 
-instruction_context = InstructionContext()
+persona_context = PersonaContext()
 
-agent.register_context(instruction_context)
-agent.register_tool(instruction_context.tools[0])
+agent.register_context(persona_context)
 
 print(agent.run_loop("List the tools available to you"))
 print(agent.run_loop("create an instruction called math_teacher who explains math problems step by step"))

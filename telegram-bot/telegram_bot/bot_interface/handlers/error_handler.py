@@ -6,7 +6,9 @@ logger = logging.getLogger(__name__)
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Error handler"""
-    logger.error(f"Update {update} caused error {context.error}")
+    logger.error(f"Update {update} caused error {context.error}\n\n{context}")
+    import traceback
+    traceback.print_exc()
     
     try:
         if isinstance(update, Update) and update.effective_message:

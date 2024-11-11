@@ -1,12 +1,9 @@
+from typing import Dict, Optional
 from flask import Flask, render_template_string
-from typing import TYPE_CHECKING
 import threading
-import webbrowser
 from swarmer.debug_ui.context_ui import ContextDebugUI
+from swarmer.types import AgentBase
 from litellm import Message
-
-if TYPE_CHECKING:
-    from swarmer.agent import Agent
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -261,13 +258,13 @@ HTML_TEMPLATE = """
                             <h4>{{ name }}</h4>
                             <div class="tool-schema">
                                 <div class="tool-meta">
-                                    <strong>Description:</strong> {{ tool.schema.get('description', 'No description') }}
+                                    <strong>Description:</strong> {{ tool.__tool_schema__.get('description', 'No description') }}
                                 </div>
-                                {% if tool.schema.get('parameters') %}
+                                {% if tool.__tool_schema__.get('parameters') %}
                                     <div class="tool-parameters">
                                         <strong>Parameters:</strong>
                                         <ul>
-                                        {% for param in tool.schema['parameters'].get('properties', {}).items() %}
+                                        {% for param in tool.__tool_schema__.get('parameters', {}).get('properties', {}).items() %}
                                             <li>
                                                 <code>{{ param[0] }}</code>
                                                 {% if param[1].get('type') %}
@@ -300,13 +297,13 @@ HTML_TEMPLATE = """
 """
 
 class DebugUIServer:
-    def __init__(self, agent: 'Agent', port: int = 5000):
+    def __init__(self, agent: AgentBase, port: int = 5000) -> None:
         self.agent = agent
         self.port = port
         self.app = Flask(__name__)
         
         @self.app.route('/')
-        def home():
+        def home() -> str:
             # Create context UIs
             context_uis = {}
             for context in self.agent.contexts.values():
@@ -331,13 +328,13 @@ class DebugUIServer:
                 current_context=current_context
             )
     
-    def start(self):
+    def start(self) -> None:
         """Start the debug UI server in a separate thread"""
-        def run_server():
+        def run_server() -> None:
             self.app.run(port=self.port, debug=False)
             
         self.server_thread = threading.Thread(target=run_server, daemon=True)
         self.server_thread.start()
         
         # Open the browser
-        # webbrowser.open(f'http://127.0.0.1:{self.port}') 
+        # webbrowser.open(f'http://127.0.0.1:{self.port}')

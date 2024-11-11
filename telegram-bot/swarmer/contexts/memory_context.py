@@ -1,5 +1,5 @@
-from typing import Optional, Dict, List
-import uuid
+from typing import Optional, Dict, List, Tuple
+from uuid import UUID, uuid4
 import json
 import time
 from dataclasses import dataclass
@@ -35,19 +35,18 @@ class MemoryContext(Context):
     Agents should actively maintain their memories by adding new insights and
     updating existing ones."""
     
-    tools: list[Tool] = []
+    tools: List[Tool] = []
     # agent_id -> {memory_id -> MemoryEntry}
-    agent_memories: Dict[str, Dict[str, MemoryEntry]] = {}
 
     def __init__(self) -> None:
-        MemoryContext.tools.extend([
-            MemoryContext.add_memory,
-            MemoryContext.get_memories_by_category,
-            MemoryContext.update_memory,
-            MemoryContext.remove_memory
+        self.agent_memories: Dict[str, Dict[str, MemoryEntry]] = {}
+        self.tools.extend([
+            self.add_memory,
+            self.get_memories_by_category,
+            self.update_memory,
+            self.remove_memory
         ])
-        self.id = uuid.uuid4()
-        super().__init__()
+        self.id = str(uuid4())
 
     def get_context_instructions(self, agent: AgentIdentity) -> Optional[str]:
         return """
@@ -83,15 +82,14 @@ class MemoryContext(Context):
         Only mention memory capabilities if relevant to the conversation.
         """
 
-    @staticmethod
-    def get_context(agent: AgentIdentity) -> Optional[str]:
+    def get_context(self, agent: AgentIdentity) -> Optional[str]:
         """Return relevant memories for the current context."""
-        memories = MemoryContext.agent_memories.get(agent.uuid, {})
+        memories = self.agent_memories.get(agent.id, {})
         if not memories:
             return None
             
         # Format memories by category
-        categorized = {}
+        categorized: Dict[str, List[Tuple[str, str]]] = {}
         for memory_id, memory in memories.items():
             if memory.category not in categorized:
                 categorized[memory.category] = []
@@ -106,14 +104,15 @@ class MemoryContext(Context):
 
         return "\n".join(context_parts)
 
-    def _get_agent_memories(agent_identity: AgentIdentity) -> Dict[str, MemoryEntry]:
+    def _get_agent_memories(self, agent_identity: AgentIdentity) -> Dict[str, MemoryEntry]:
         """Get or initialize agent's memory store."""
-        if agent_identity.uuid not in MemoryContext.agent_memories:
-            MemoryContext.agent_memories[agent_identity.uuid] = {}
-        return MemoryContext.agent_memories[agent_identity.uuid]
+        if agent_identity.id not in self.agent_memories:
+            self.agent_memories[agent_identity.id] = {}
+        return self.agent_memories[agent_identity.id]
 
     @tool
     def add_memory(
+        self,
         agent_identity: AgentIdentity,
         content: str,
         importance: int,
@@ -132,6 +131,7 @@ class MemoryContext(Context):
         Returns:
             Confirmation message
         """
+
         if not 1 <= importance <= 10:
             return "Failed to add memory: Importance must be between 1 and 10"
             
@@ -147,14 +147,15 @@ class MemoryContext(Context):
             source=source
         )
         
-        memory_id = str(uuid.uuid4())
-        memories = MemoryContext._get_agent_memories(agent_identity)
+        memory_id = str(uuid4())
+        memories = self._get_agent_memories(agent_identity)
         memories[memory_id] = memory
         
         return f"Added new memory (ID: {memory_id}):\nContent: {content}\nCategory: {category}\nImportance: {importance}"
 
     @tool
     def get_memories_by_category(
+        self,
         agent_identity: AgentIdentity,
         category: str
     ) -> str:
@@ -167,7 +168,7 @@ class MemoryContext(Context):
         Returns:
             Formatted string of matching memories
         """
-        memories = MemoryContext._get_agent_memories(agent_identity)
+        memories = self._get_agent_memories(agent_identity)
         matching = {
             mid: m for mid, m in memories.items()
             if m.category == category
@@ -184,6 +185,7 @@ class MemoryContext(Context):
 
     @tool
     def update_memory(
+        self,
         agent_identity: AgentIdentity,
         memory_id: str,
         content: str,
@@ -200,7 +202,7 @@ class MemoryContext(Context):
         Returns:
             Confirmation message
         """
-        memories = MemoryContext._get_agent_memories(agent_identity)
+        memories = self._get_agent_memories(agent_identity)
         if memory_id not in memories:
             return f"Failed to update: Memory {memory_id} not found"
             
@@ -222,6 +224,7 @@ class MemoryContext(Context):
 
     @tool
     def remove_memory(
+        self,
         agent_identity: AgentIdentity,
         memory_id: str
     ) -> str:
@@ -234,7 +237,7 @@ class MemoryContext(Context):
         Returns:
             Confirmation message
         """
-        memories = MemoryContext._get_agent_memories(agent_identity)
+        memories = self._get_agent_memories(agent_identity)
         if memory_id not in memories:
             return f"Failed to remove: Memory {memory_id} not found"
             
