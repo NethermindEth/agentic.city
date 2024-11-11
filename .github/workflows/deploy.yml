@@ -68,8 +68,8 @@ jobs:
       - name: Run tests
         working-directory: ./telegram-bot
         run: |
-          poetry run mypy telegram_bot/
-          poetry run pytest
+          poetry run mypy --no-incremental telegram_bot/
+          poetry run pytest --cache-clear
         
       - name: Build deployment package
         working-directory: ./telegram-bot
