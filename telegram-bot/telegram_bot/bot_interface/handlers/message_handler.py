@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.error import TelegramError
 
-from telegram_bot.agents.basic import agent
+from telegram_bot.agents.agent_manager import agent_manager
 
 logger = logging.getLogger(__name__)
 
@@ -55,10 +55,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     logger.info(f'User ({user_id}) in {message_type}: "{text}"')
     
     try:
+        # Get or create agent for this user
+        agent = agent_manager.get_or_create_agent(user_id)
         messages = agent.run_loop(text)
         
         for message in messages:
-            print("++++++++++++++", message)
             if message.role == "assistant" and message.content:
                 await update.message.reply_text(message.content)
             elif message.role == "tool":

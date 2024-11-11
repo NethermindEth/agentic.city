@@ -1,5 +1,5 @@
 from typing import Dict, Optional
-from flask import Flask, render_template_string
+from flask import Flask, render_template_string, abort
 import threading
 from swarmer.debug_ui.context_ui import ContextDebugUI
 from swarmer.types import AgentBase
@@ -297,16 +297,79 @@ HTML_TEMPLATE = """
 """
 
 class DebugUIServer:
-    def __init__(self, agent: AgentBase, port: int = 5000) -> None:
-        self.agent = agent
+    def __init__(self, port: int = 5000) -> None:
         self.port = port
+        self.agents: Dict[int, AgentBase] = {}
         self.app = Flask(__name__)
         
         @self.app.route('/')
         def home() -> str:
+            """Display list of all agents"""
+            agent_list = {
+                user_id: agent.identity.name 
+                for user_id, agent in self.agents.items()
+            }
+            return render_template_string(
+                """
+                <html>
+                <head>
+                    <title>Agent Debug UI</title>
+                    <style>
+                        body { 
+                            font-family: Arial, sans-serif; 
+                            margin: 0;
+                            padding: 20px;
+                            background: #f5f5f5;
+                        }
+                        .agent-list {
+                            max-width: 800px;
+                            margin: 0 auto;
+                        }
+                        .agent-entry {
+                            background: white;
+                            padding: 15px;
+                            margin: 10px 0;
+                            border-radius: 8px;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                        }
+                        a {
+                            color: #007bff;
+                            text-decoration: none;
+                        }
+                        a:hover {
+                            text-decoration: underline;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="agent-list">
+                        <h1>Active Agents</h1>
+                        {% for user_id, name in agents.items() %}
+                            <div class="agent-entry">
+                                <h3>{{ name }}</h3>
+                                <p>User ID: {{ user_id }}</p>
+                                <a href="/agent/{{ user_id }}">View Details →</a>
+                            </div>
+                        {% else %}
+                            <p>No active agents</p>
+                        {% endfor %}
+                    </div>
+                </body>
+                </html>
+                """,
+                agents=agent_list
+            )
+
+        @self.app.route('/agent/<int:user_id>')
+        def agent_details(user_id: int) -> str:
+            """Display details for a specific agent"""
+            agent = self.agents.get(user_id)
+            if not agent:
+                abort(404)
+
             # Create context UIs
             context_uis = {}
-            for context in self.agent.contexts.values():
+            for context in agent.contexts.values():
                 ui = ContextDebugUI.get_ui_for_context(context)
                 if ui:
                     context_uis[context.id] = ui.render()
@@ -316,18 +379,26 @@ class DebugUIServer:
             constitution_text = constitution.instruction
             
             # Get context instructions and current context
-            context_instructions = self.agent.get_context_instructions()
-            current_context = self.agent.get_context()
+            context_instructions = agent.get_context_instructions()
+            current_context = agent.get_context()
                     
             return render_template_string(
                 HTML_TEMPLATE, 
-                agent=self.agent,
+                agent=agent,
                 context_uis=context_uis,
                 constitution_text=constitution_text,
                 context_instructions=context_instructions,
                 current_context=current_context
             )
     
+    def register_agent(self, user_id: int, agent: AgentBase) -> None:
+        """Register an agent with the debug UI"""
+        self.agents[user_id] = agent
+
+    def unregister_agent(self, user_id: int) -> None:
+        """Unregister an agent from the debug UI"""
+        self.agents.pop(user_id, None)
+
     def start(self) -> None:
         """Start the debug UI server in a separate thread"""
         def run_server() -> None:
@@ -335,6 +406,3 @@ class DebugUIServer:
             
         self.server_thread = threading.Thread(target=run_server, daemon=True)
         self.server_thread.start()
-        
-        # Open the browser
-        # webbrowser.open(f'http://127.0.0.1:{self.port}')

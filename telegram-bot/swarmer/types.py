@@ -149,6 +149,22 @@ class Context(ABC):
         """
         pass
 
+    @abstractmethod
+    def serialize(self) -> dict:
+        """Serialize context state to a dictionary"""
+        pass
+
+    @classmethod
+    @abstractmethod
+    def deserialize(cls, state: dict) -> 'Context':
+        """Create a context from serialized state"""
+        pass
+
+    @abstractmethod
+    def deserialize(self, state: dict, agent_identity: AgentIdentity) -> None:
+        """Load state into this context instance"""
+        pass
+
 class AgentBase(ABC):
     """Abstract base class representing an AI agent with its capabilities and settings.
     

@@ -1,9 +1,9 @@
 from telegram import Update
 from telegram.ext import ContextTypes
-from telegram_bot.agents.basic import agent
 import json
 from typing import Any
 from uuid import UUID
+from telegram_bot.agents.agent_manager import agent_manager
 
 def serialize_object(obj: Any) -> Any:
     """Helper function to serialize objects"""
@@ -24,11 +24,11 @@ def serialize_object(obj: Any) -> Any:
         return str(obj)
 
 async def dump_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handler for /dump command - dumps the entire agent state"""
-    if update.message is None:
+    """Handler for /dump command"""
+    if not update.message or not update.effective_user:
         return
-        
-    # Get agent state
+
+    agent = agent_manager.get_or_create_agent(update.effective_user.id)
     state = {
         "identity": serialize_object(agent.identity),
         "token_usage": agent.get_token_usage(),

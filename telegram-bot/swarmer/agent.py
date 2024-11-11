@@ -3,16 +3,76 @@ from swarmer.types import AgentBase, AgentIdentity, Context, Tool, Message
 from typing import Any, Optional, List, Dict
 from swarmer.globals.consitution import constitution
 from litellm import completion
+from swarmer.globals.agent_registry import agent_registry
 import uuid
-from swarmer.debug_ui.server import DebugUIServer
 
 class Agent(AgentBase):
+    @staticmethod
+    def save_state(agent: 'Agent', file_path: str) -> None:
+        """Save agent state to file"""
+        state = {
+            "identity": {
+                "name": agent.identity.name,
+                "id": agent.identity.id
+            },
+            "token_budget": agent.token_budget,
+            "model": agent.model,
+            "token_usage": agent.token_usage,
+            "message_log": [msg.dict() for msg in agent.message_log],
+            "contexts": {
+                context.__class__.__name__: context.serialize()
+                for context in agent.contexts.values()
+            }
+        }
+        with open(file_path, 'w') as f:
+            json.dump(state, f, indent=2)
+
+    @staticmethod
+    def load_state(file_path: str) -> 'Agent':
+        """Load agent state from file"""
+        with open(file_path, 'r') as f:
+            state = json.load(f)
+
+        # Create new agent with basic params
+        agent = Agent(
+            name=state["identity"]["name"],
+            token_budget=state["token_budget"],
+            model=state["model"]
+        )
+        agent.identity.id = state["identity"]["id"]
+        agent.token_usage = state["token_usage"]
+        agent.message_log = [Message(**msg) for msg in state["message_log"]]
+
+        # Register agent in registry before deserializing contexts
+        agent_registry.registry[agent.identity.id] = agent
+
+        # Import and instantiate contexts
+        from swarmer.contexts.persona_context import PersonaContext
+        from swarmer.contexts.memory_context import MemoryContext
+        
+        context_classes = {
+            "PersonaContext": PersonaContext,
+            "MemoryContext": MemoryContext
+        }
+
+        # First register fresh contexts with the saved IDs
+        for context_name, context_state in state["contexts"].items():
+            context_class = context_classes[context_name]
+            context = context_class()
+            context.id = context_state["id"]  # Set the ID before registration
+            agent.register_context(context)
+
+        # Then deserialize their state
+        for context_name, context_state in state["contexts"].items():
+            agent.contexts[context_state["id"]].deserialize(context_state, agent.identity)
+
+        return agent
+
     def __init__(
         self,
         name: str,
         token_budget: int,
         model: str,
-        debug_ui: bool = True,
     ):
         """
         Initialize an Agent with required attributes from AgentBase.
@@ -21,7 +81,6 @@ class Agent(AgentBase):
             name: The display name of the agent
             token_budget: Maximum tokens the agent can use
             model: The model to use for completions
-            debug_ui: Whether to start the debug UI server
         """
         self.identity = AgentIdentity(name=name, id=str(uuid.uuid4()))
         self.contexts: dict[str, Context] = {}
@@ -34,10 +93,6 @@ class Agent(AgentBase):
             "completion_tokens": 0,
             "total_tokens": 0
         }
-
-        if debug_ui:
-            self.debug_server = DebugUIServer(self)
-            self.debug_server.start()
 
     # -----
     # Tools
@@ -59,7 +114,7 @@ class Agent(AgentBase):
         # Register tools
         for tool in context.tools:
             self.register_tool(tool)
-    
+
     def unregister_context(self, context_id: str) -> None:
         """Unregister a context from the agent."""
         self.contexts.pop(context_id)
@@ -85,6 +140,21 @@ class Agent(AgentBase):
             content=f"Current context:\n\n{context_str}"
         )
 
+        # print("\n=== Model ===")
+        # print(f"{self.model}")
+        
+        # print("\n=== Tool Schemas ===") 
+        # # Print first schema in detail, summarize others
+        # schemas = self.get_tool_schemas()
+        # if schemas:
+        #     print(f"{schemas[0]}")  # Print first one in full
+        #     if len(schemas) > 1:
+        #         print(f"...and {len(schemas)-1} more tool schemas")
+        # print("\n=== Messages ===")
+        # for msg in [system_message, *self.message_log, context_message, user_message]:
+        #     print(f"\n[{msg.role.upper()}]")
+        #     print(f"{msg.content}")
+        # print("\n")
         response = completion(
             model=self.model,
             messages=[system_message, *self.message_log, context_message, user_message],
@@ -104,7 +174,6 @@ class Agent(AgentBase):
         while response.choices[0].finish_reason == "tool_calls":
             # TODO: handle in parallel
             for tool_call in message.tool_calls:
-                print(f"tool_call: {tool_call}")
                 tool_result = self.execute_tool_call(tool_call)
                 tool_result_message = Message(role="tool", content=tool_result, tool_call_id=tool_call.id)
                 response_history.append(tool_result_message)
@@ -148,7 +217,7 @@ class Agent(AgentBase):
 
     def get_tool_schemas(self) -> Optional[List[dict]]:
         """Get the tool schemas for the agent."""
-        print([type(tool) for tool in self.tools.values()])
+        print([type(tool.__tool_schema__) for tool in self.tools.values()])
         return [tool.__tool_schema__ for tool in self.tools.values()] if self.tools else None
 
     def get_token_usage(self) -> Dict[str, int]:

@@ -244,3 +244,35 @@ class MemoryContext(Context):
         memory = memories[memory_id]
         del memories[memory_id]
         return f"Removed memory (ID: {memory_id}):\nContent: {memory.content}\nCategory: {memory.category}"
+
+    def serialize(self) -> dict:
+        """Serialize context state"""
+        return {
+            "id": self.id,
+            "agent_memories": {
+                agent_id: {
+                    memory_id: {
+                        "content": memory.content,
+                        "importance": memory.importance,
+                        "category": memory.category,
+                        "source": memory.source,
+                        "timestamp": memory.timestamp
+                    }
+                    for memory_id, memory in memories.items()
+                }
+                for agent_id, memories in self.agent_memories.items()
+            }
+        }
+
+    def deserialize(self, state: dict, agent_identity: AgentIdentity) -> None:
+        """Load state into this context instance"""
+        self.id = state["id"]
+        
+        # Restore memories
+        self.agent_memories = {
+            agent_id: {
+                memory_id: MemoryEntry(**memory_data)
+                for memory_id, memory_data in memories.items()
+            }
+            for agent_id, memories in state["agent_memories"].items()
+        }

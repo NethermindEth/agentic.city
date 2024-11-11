@@ -34,3 +34,5 @@ var/
 
 # Mypy
 .mypy_cache/
+
+data/
