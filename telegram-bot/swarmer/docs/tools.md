@@ -46,9 +46,22 @@ Tools are functions that agents can use to interact with their environment and p
        tools: list[Tool] = []
        
        def __init__(self) -> None:
-           self.tools.append(self.my_tool)
+           # INCORRECT - Don't use self.my_tool
+           # self.tools.append(self.my_tool)  # This binds context as first param!
+           
+           # CORRECT - Use the static class method
+           self.tools.append(MyContext.my_tool)
            self.id = uuid.uuid4()
+
+       @tool
+       def my_tool(agent_identity: AgentIdentity, arg1: str) -> str:
+           """Tool implementation"""
+           pass
    ```
+
+   **Important**: Tools must be registered using their static class method version (MyContext.my_tool), 
+   not the instance method version (self.my_tool). Using self.my_tool will incorrectly bind the 
+   context instance as the first parameter instead of agent_identity.
 
 2. **Agent Level**
    ```python
@@ -123,9 +136,9 @@ def tool(func: Callable[[AgentIdentity, *tuple[Any, ...]], str]) -> Tool:
    def safe_tool(agent_identity: AgentIdentity) -> str:
        try:
            # Tool implementation
-           return "Success"
+           return "Successfully performed action X"  # Describe success
        except Exception as e:
-           return f"Error: {str(e)}"
+           return f"Error: {str(e)}"  # Describe failure
    ```
 
 3. **Type Hints**
@@ -211,3 +224,42 @@ class WeatherContext(Context):
    - Combining tools
    - Tool pipelines
    - Tool dependencies 
+
+## Tool Requirements
+
+1. **Agent Identity Parameter**
+   ```python
+   @tool
+   def my_tool(agent_identity: AgentIdentity, arg1: str) -> str:
+       """Tool documentation string"""
+       # agent_identity is always the first parameter
+       return "Action completed: modified user preference"  # Must return descriptive result
+   ```
+
+2. **Return Value**
+   - Must return a non-empty string describing the result
+   - String should explain what action was taken
+   - Helps agent understand tool execution outcome
+   - Examples:
+     ```python
+     # Good return values:
+     return "Memory added: User prefers dark mode"
+     return "Error: Invalid category provided"
+     return "Updated persona to: Math Teacher"
+     
+     # Bad return values:
+     return ""  # Empty string not allowed
+     return None  # Must return string
+     return "Done"  # Too vague
+     ```
+
+3. **Error Handling**
+   ```python
+   @tool
+   def safe_tool(agent_identity: AgentIdentity) -> str:
+       try:
+           # Tool implementation
+           return "Successfully performed action X"  # Describe success
+       except Exception as e:
+           return f"Error: {str(e)}"  # Describe failure
+   ```

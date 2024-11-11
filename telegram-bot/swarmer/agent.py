@@ -88,7 +88,7 @@ class Agent(AgentBase):
 
         response_history = [message]
 
-        while message.tool_calls:
+        while response.choices[0].finish_reason == "tool_calls":
             # TODO: handle in parallel
             tool_results= []
             for tool_call in message.tool_calls:
@@ -108,14 +108,17 @@ class Agent(AgentBase):
             message = response.choices[0].message
             response_history.append(message)
         
-        self.message_log += response_history
+        self.message_log += [user_message, *response_history]
         return response_history
 
     def execute_tool_call(self, tool_call):
+        """Execute a tool call and return a formatted result string"""
         name = tool_call.function.name
         args = json.loads(tool_call.function.arguments)
         
-        return self.tools[name](self.identity, **args)
+        result = self.tools[name](self.identity, **args)
+        
+        return result
 
     def get_context_instructions(self) -> list[str]:
         """Get the context instructions for the agent."""
