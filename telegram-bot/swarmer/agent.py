@@ -79,9 +79,10 @@ class Agent(AgentBase):
             ])
         )
 
+        context_str = "\n\n".join(self.get_context())
         context_message = Message(
             role="system", 
-            content=f"Current context:\n\n{'\n\n'.join(self.get_context())}"
+            content=f"Current context:\n\n{context_str}"
         )
 
         response = completion(
@@ -108,9 +109,10 @@ class Agent(AgentBase):
                 tool_result_message = Message(role="tool", content=tool_result, tool_call_id=tool_call.id)
                 response_history.append(tool_result_message)
 
+            context_str = "\n\n".join(self.get_context())
             context_message = Message(
                 role="system", 
-                content=f"Current context:\n\n{'\n\n'.join(self.get_context())}"
+                content=f"Current context:\n\n{context_str}"
             )
  
             response = completion(
