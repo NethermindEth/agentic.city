@@ -1,39 +1,60 @@
-Swarmer is like openai's swarm but less
-less is more
+# Swarmer Framework
 
+Swarmer is a modular framework for building intelligent agents with specialized capabilities.
 
-Features
-# Agent identity
-An agent identity is specified by a UUID
+## Key Features
 
-Instruction
-# Handoff functionality
-The AI runner can subsitute the operating agent in entirity while maintaining the history of the current invokation of the chat with the agent (the message log)
-Tools can specify agents which are to be handed over to.
+### 🧩 Context-Based Architecture
+Agents gain capabilities through attachable contexts that provide:
+- Specialized functionality (memory, personality management, etc.)
+- State management
+- Domain-specific tools
+- Behavioral guidelines
 
-# Parallel Tool use
-Agents should be able to evoke tools in parallel
++ [Learn about message flow and context injection](./docs/message_flow.md)
 
-The following is an example of a response from chatgpt
+Available contexts include:
+- 🎭 Persona Context: Personality and behavior management
+- 🧠 Memory Context: Information persistence across conversations
+- 🗺️ Explorer Context: Environmental awareness and navigation
+
+[Learn more about contexts](./contexts/README.md)
+
+### 🤖 Agent Identity
+- Each agent has a unique identity specified by UUID
+- Agents can maintain multiple personas
+- State persists across conversations
+
+### 🔄 Dynamic Tool Management
+- Tools can be added/removed at runtime
+- Contexts provide specialized tool sets
+- Parallel tool execution support
+
+### 📡 Event Handling
+- Cron-like scheduled operations
+- Data stream subscriptions
+- Event-driven agent activation
+
+## Getting Started
+
+1. Set up environment variables for your model:
+```bash
+# See https://docs.litellm.ai/docs/#litellm-python-sdk
+export OPENAI_API_KEY=your_key_here
 ```
-ModelResponse(id='chatcmpl-ARrz19OS9RSi3cAYbexBQxcedCct3', created=1731205731, model='gpt-3.5-turbo-0125', object='chat.completion', system_fingerprint=None, choices=[Choices(finish_reason='tool_calls', index=0, message=Message(content=None, role='assistant', tool_calls=[ChatCompletionMessageToolCall(function=Function(arguments='{"location":"Boston","unit":"celsius"}', name='get_current_weather'), id='call_pwjncOZJA1C8Zm20sDzr3lCG', type='function')], function_call=None))], usage=Usage(completion_tokens=20, prompt_tokens=83, total_tokens=103, completion_tokens_details=CompletionTokensDetailsWrapper(accepted_prediction_tokens=0, audio_tokens=0, reasoning_tokens=0, rejected_prediction_tokens=0, text_tokens=None), prompt_tokens_details=PromptTokensDetailsWrapper(audio_tokens=0, cached_tokens=0, text_tokens=None, image_tokens=None)), service_tier=None)
+
+2. Create an agent with desired contexts:
+```python
+from swarmer.agent import Agent
+from swarmer.contexts.persona_context import PersonaContext
+
+# Create agent
+agent = Agent("Assistant", token_budget=1000000, model="gpt-4")
+
+# Add persona context
+persona_context = PersonaContext()
+agent.register_context(persona_context)
+
+# Run agent
+response = agent.run_loop("Hello!")
 ```
-
-# Dynamic tools
-It should be easy to change the toolset of an agent
-Updating this set should be provided as a tool
-
-# Tool Creation
-Agents should be able to create their own tools
-
-# Wakeup
-Agents must be able to define a cron-like job which runs at regular intervals OR
-be able to subscribe to streams of data.
-Agents should be able to define code transformations over these data.
-Agents should wake up from these streams.
-
-
-Getting started:
-
-Set the environment variables for your model as demonstrated here:
-https://docs.litellm.ai/docs/#litellm-python-sdk

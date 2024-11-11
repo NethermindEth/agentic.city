@@ -49,16 +49,20 @@ class Tool(Callable[[AgentIdentity, *tuple[Any, ...]], Any]):
     id: str
 
 class Context(ABC):
-    """Represents dynamic contextual information and tools that can be accessed by an agent.
+    """A Context represents a dynamic aspect of an agent's operational environment.
     
-    Contexts provide time-sensitive data, memory, or other information that may change between
-    invocations. Agents can interact with and modify contexts through exposed tools.
-
+    Contexts are fundamental building blocks that provide agents with:
+    1. State Management: Maintain and manage dynamic state that persists across interactions
+    2. Specialized Tools: Expose domain-specific tools for interacting with the context
+    3. Behavioral Guidelines: Provide instructions on how to utilize the context
+    4. Environmental Awareness: Supply real-time information about their current state
+    
+    Each context is independent and focuses on a specific aspect of agent functionality,
+    such as personality management, memory retention, or environmental exploration.
+    
     Attributes:
-        id (str): hash of the context's source code TODO (vulnerability): this is not secure, we would need to hash all dependencies or rely on nix. But this will work for now.
-        tools (list[Tool]): List of tools exposed by this context that allow the agent to interact with it
-        get_context (Callable): Function that retrieves the current context state for a specific agent
-        get_context_instructions (Callable): Function that retrieves the instructions for how the agent should use and interact with this context
+        id (str): Unique identifier for the context
+        tools (list[Tool]): Tools this context provides to the agent
     """
     id: str
     tools: list[Tool]
@@ -69,23 +73,50 @@ class Context(ABC):
 
     @abstractmethod
     def get_context(self, agent: AgentIdentity) -> Optional[str]:
+        """Retrieve the current state information for this context.
+        
+        This method returns real-time information about the context's current state
+        that the agent should be aware of when making decisions.
+        
+        Args:
+            agent: The identity of the agent requesting context
+            
+        Returns:
+            String describing current context state or None if no state info is needed
+        """
         pass
 
     @abstractmethod
     def get_context_instructions(self, agent: AgentIdentity) -> Optional[str]:
+        """Retrieve instructions for how the agent should use this context.
+        
+        This method returns guidelines and behavioral instructions that help the agent
+        understand how to properly utilize this context and its tools.
+        
+        Args:
+            agent: The identity of the agent requesting instructions
+            
+        Returns:
+            String containing usage instructions or None if no instructions needed
+        """
         pass
 
 class AgentBase(ABC):
     """Abstract base class representing an AI agent with its capabilities and settings.
+    
+    Agents are modular entities whose behavior is shaped by their attached contexts.
+    Each context provides a different aspect of functionality, from personality management
+    to memory retention to environmental interaction.
 
     Attributes:
         identity (AgentIdentity): The agent's identity information
-        instruction (Instruction): Current active instruction
-        instruction_set (dict[str, Instruction]): Set of available instructions
-        context (dict[str, Context]): Set of available contexts (context_id -> context)
-        tools (dict[str, Tool]): Set of available tools (name -> tool)
+        persona (Persona): Current active persona defining behavior
+        persona_collection (dict[str, Persona]): Available personas
+        context (dict[str, Context]): Active contexts providing different capabilities
+        tools (dict[str, Tool]): Available tools from all contexts
         token_budget (int): Maximum tokens the agent can use
         model (str): The model to use for the agent
+        _history (list[Message]): Conversation history
     """
     identity: AgentIdentity
     # TODO: model instructions as a context
