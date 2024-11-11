@@ -1,6 +1,6 @@
 import json
 from swarmer.types import AgentBase, AgentIdentity, Context, Tool, Message
-from typing import Any, Optional, List, Dict, cast
+from typing import Any, Optional, List, Dict
 from swarmer.globals.consitution import constitution
 from litellm import completion
 import uuid
@@ -81,7 +81,7 @@ class Agent(AgentBase):
 
         context_message = Message(
             role="system", 
-            content=f"Current context:\n\n{"\n\n".join(self.get_context())}"
+            content=f"Current context:\n\n{'\n\n'.join(self.get_context())}"
         )
 
         response = completion(
@@ -110,7 +110,7 @@ class Agent(AgentBase):
 
             context_message = Message(
                 role="system", 
-                content=f"Current context:\n\n{"\n\n".join(self.get_context())}"
+                content=f"Current context:\n\n{'\n\n'.join(self.get_context())}"
             )
  
             response = completion(
