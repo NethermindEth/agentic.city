@@ -9,6 +9,6 @@ class AgentRegistry_(AgentRegistry):
       pass
    
    def get_agent(self, agent_identity: AgentIdentity) -> AgentBase:
-      return self.registry[agent_identity.uuid]
+      return self.registry[agent_identity.id]
    
 agent_registry = AgentRegistry_()

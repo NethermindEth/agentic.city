@@ -18,5 +18,5 @@ def create_agent(agent_identity: AgentIdentity, name: str, token_budget: int, mo
         str: The UUID of the newly created agent
     """
     agent = Agent(name, token_budget, model)
-    agent_registry.registry[agent_identity.uuid] = agent
-    return agent.identity.uuid
+    agent_registry.registry[agent_identity.id] = agent
+    return agent.identity.id

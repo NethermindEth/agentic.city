@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from swarmer.contexts.persona_context import PersonaContext
+from swarmer.contexts.memory_context import MemoryContext
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
@@ -16,19 +18,16 @@ class ContextDebugUI(ABC):
     def get_ui_for_context(context: 'Context') -> Optional['ContextDebugUI']:
         """Factory method to get the appropriate UI for a context"""
         from swarmer.contexts.memory_context import MemoryContext
-        from swarmer.contexts.instruction_context import InstructionContext
         from swarmer.contexts.persona_context import PersonaContext
         
         if isinstance(context, MemoryContext):
             return MemoryContextUI(context)
-        elif isinstance(context, InstructionContext):
-            return InstructionContextUI(context)
         elif isinstance(context, PersonaContext):
             return PersonaContextUI(context)
         return None
 
 class MemoryContextUI(ContextDebugUI):
-    def __init__(self, context: 'MemoryContext'):
+    def __init__(self, context: MemoryContext):
         self.context = context
         
     def render(self) -> str:
@@ -60,36 +59,8 @@ class MemoryContextUI(ContextDebugUI):
         html += "</div></div>"
         return html
 
-class InstructionContextUI(ContextDebugUI):
-    def __init__(self, context: 'InstructionContext'):
-        self.context = context
-        
-    def render(self) -> str:
-        instructions = self.context.instruction_set
-        
-        html = """
-        <div class="context-section instruction-context">
-            <h3>Instruction Context</h3>
-            <div class="instructions">
-        """
-        
-        for instruction_id, instruction in instructions.items():
-            html += f"""
-            <div class="instruction-entry">
-                <h4>{instruction.name}</h4>
-                <div class="instruction-content">{instruction.instruction}</div>
-                <div class="instruction-meta">
-                    Description: {instruction.description}<br>
-                    ID: {instruction_id}
-                </div>
-            </div>
-            """
-            
-        html += "</div></div>"
-        return html
-
 class PersonaContextUI(ContextDebugUI):
-    def __init__(self, context: 'PersonaContext'):
+    def __init__(self, context: PersonaContext):
         self.context = context
         
     def render(self) -> str:
