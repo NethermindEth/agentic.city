@@ -4,6 +4,7 @@ from typing import Optional, List, Dict
 from swarmer.globals.consitution import constitution
 from litellm import Message, completion
 import uuid
+from swarmer.debug_ui.server import DebugUIServer
 
 class Agent(AgentBase):
     def __init__(
@@ -11,6 +12,7 @@ class Agent(AgentBase):
         name: str,
         token_budget: int,
         model: str,
+        debug_ui: bool = True,
     ):
         """
         Initialize an Agent with required attributes from AgentBase.
@@ -19,6 +21,7 @@ class Agent(AgentBase):
             name: The display name of the agent
             token_budget: Maximum tokens the agent can use
             model: The model to use for completions
+            debug_ui: Whether to start the debug UI server
         """
         self.identity = AgentIdentity(name=name, uuid=str(uuid.uuid4()))
         self.contexts: dict[str, Context] = {}
@@ -31,6 +34,10 @@ class Agent(AgentBase):
             "completion_tokens": 0,
             "total_tokens": 0
         }
+
+        if debug_ui:
+            self.debug_server = DebugUIServer(self)
+            self.debug_server.start()
 
     # -----
     # Tools
