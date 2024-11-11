@@ -83,6 +83,7 @@ jobs:
           HOST: ${{ secrets.AWS_HOST }}
           USERNAME: ${{ secrets.AWS_USERNAME }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           POLLING_INTERVAL: '3.0'
           LOG_LEVEL: 'INFO'
         run: |
@@ -110,6 +111,7 @@ jobs:
             
             echo "Creating .env file..."
             echo "TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}" > ~/telegram-bot/.env
+            echo "OPENAI_API_KEY=${OPENAI_API_KEY}" >> ~/telegram-bot/.env
             echo "POLLING_INTERVAL=${POLLING_INTERVAL}" >> ~/telegram-bot/.env
             echo "LOG_LEVEL=${LOG_LEVEL}" >> ~/telegram-bot/.env
             
