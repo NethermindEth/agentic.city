@@ -14,7 +14,7 @@ from swarmer.debug_ui.server import DebugUIServer
 logger = logging.getLogger(__name__)
 
 class AgentManager:
-    def __init__(self, save_dir: str = "data/agents", autosave_interval: int = 1, debug_ui: bool = True):
+    def __init__(self, save_dir: str = "data/agents", autosave_interval: int = 20, debug_ui: bool = True):
         self.agents: Dict[int, Agent] = {}
         self.save_dir = Path(save_dir)
         self.save_dir.mkdir(parents=True, exist_ok=True)
@@ -29,7 +29,7 @@ class AgentManager:
 
     def _setup_autosave(self) -> None:
         """Setup periodic autosave"""
-        def schedule_next_save():
+        def schedule_next_save() -> None:
             self.save_all_agents()
             Timer(self.autosave_interval, schedule_next_save).start()
         

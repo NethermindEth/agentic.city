@@ -11,7 +11,7 @@ class Config:
     TELEGRAM_BOT_TOKEN: Final[str] = os.environ.get('TELEGRAM_BOT_TOKEN', '')
     POLLING_INTERVAL: Final[float] = float(os.environ.get('POLLING_INTERVAL', '3.0'))
     LOG_LEVEL: Final[str] = os.environ.get('LOG_LEVEL', 'INFO')
-    ADMIN_ID: Final[str] = os.environ.get('ADMIN_ID', '')
+    ADMIN_ID: str = os.environ.get('ADMIN_ID', '')
 
     def validate(self) -> None:
         if not self.TELEGRAM_BOT_TOKEN:
