@@ -74,7 +74,7 @@ def tool(
         return func(*args, **kwargs)
 
     wrapper = cast(Tool, _wrapper)
-    __tool_id__ = hashlib.sha256(inspect.getsource(wrapper).encode()).hexdigest()
+    __tool_id__ = hashlib.sha256(inspect.getsource(func).encode()).hexdigest()
     # Copy over function metadata
     wrapper.__doc__ = func.__doc__
     wrapper.__name__ = func.__name__ + __tool_id__[:16]

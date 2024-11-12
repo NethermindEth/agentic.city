@@ -86,6 +86,8 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           POLLING_INTERVAL: '3.0'
           LOG_LEVEL: 'INFO'
+          ETH_RPC_URL: ${{ secrets.ETH_RPC_URL }}
+          KEYS_DIRECTORY: '/secure/keys'
         run: |
           # Write the private key to a file
           echo "$PRIVATE_KEY" > private_key.pem
@@ -114,6 +116,8 @@ jobs:
             echo "OPENAI_API_KEY=${OPENAI_API_KEY}" >> ~/telegram-bot/.env
             echo "POLLING_INTERVAL=${POLLING_INTERVAL}" >> ~/telegram-bot/.env
             echo "LOG_LEVEL=${LOG_LEVEL}" >> ~/telegram-bot/.env
+            echo "ETH_RPC_URL=${ETH_RPC_URL}" >> ~/telegram-bot/.env
+            echo "KEYS_DIRECTORY=${KEYS_DIRECTORY}" >> ~/telegram-bot/.env
             
             echo "Installing dependencies..."
             cd ~/telegram-bot
@@ -136,3 +140,8 @@ jobs:
             
             echo "Checking service status..."
             sudo systemctl status telegram-bot --no-pager
+            
+            # Create and secure keys directory
+            sudo mkdir -p ${KEYS_DIRECTORY}
+            sudo chown $USERNAME:$USERNAME ${KEYS_DIRECTORY}
+            sudo chmod 700 ${KEYS_DIRECTORY}
