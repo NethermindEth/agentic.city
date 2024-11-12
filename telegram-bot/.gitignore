@@ -36,3 +36,4 @@ var/
 .mypy_cache/
 
 data/
+secure/

@@ -14,5 +14,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         '/info - Get information about yourself\n'
         '/usage - View token usage statistics\n'
         '/dump - Dump complete agent state\n'
+        '/tools - List available tools\n'
+        '/tools -v - List tools with detailed information\n'
         '/remove_agent <user_id> - Remove an agent for a specific user'
     ) 

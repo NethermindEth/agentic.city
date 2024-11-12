@@ -46,14 +46,17 @@ class Agent(AgentBase):
         # Register agent in registry before deserializing contexts
         agent_registry.registry[agent.identity.id] = agent
 
-        # Import and instantiate contexts
-        from swarmer.contexts.persona_context import PersonaContext
-        from swarmer.contexts.memory_context import MemoryContext
+        # Import and instantiate contexts dynamically
+        import importlib
+        import pkgutil
         
-        context_classes = {
-            "PersonaContext": PersonaContext,
-            "MemoryContext": MemoryContext
-        }
+        context_classes = {}
+        for module_info in pkgutil.iter_modules(['swarmer/contexts']):
+            if module_info.name.endswith('_context'):
+                module = importlib.import_module(f'swarmer.contexts.{module_info.name}')
+                context_class_name = ''.join(word.capitalize() for word in module_info.name.split('_'))
+                if hasattr(module, context_class_name):
+                    context_classes[context_class_name] = getattr(module, context_class_name)
 
         # First register fresh contexts with the saved IDs
         for context_name, context_state in state["contexts"].items():
@@ -217,9 +220,12 @@ class Agent(AgentBase):
 
     def get_tool_schemas(self) -> Optional[List[dict]]:
         """Get the tool schemas for the agent."""
-        print([type(tool.__tool_schema__) for tool in self.tools.values()])
         return [tool.__tool_schema__ for tool in self.tools.values()] if self.tools else None
 
     def get_token_usage(self) -> Dict[str, int]:
         """Get the current token usage statistics."""
         return self.token_usage
+
+    def clear_message_log(self) -> None:
+        """Clear the agent's message history"""
+        self.message_log.clear()

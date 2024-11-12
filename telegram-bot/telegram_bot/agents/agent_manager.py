@@ -9,6 +9,9 @@ from swarmer.agent import Agent
 from swarmer.globals.agent_registry import agent_registry
 from swarmer.contexts.persona_context import PersonaContext
 from swarmer.contexts.memory_context import MemoryContext
+from swarmer.contexts.time_context import TimeContext
+from swarmer.contexts.crypto_context import CryptoContext
+from swarmer.contexts.debug_context import DebugContext
 from swarmer.debug_ui.server import DebugUIServer
 
 logger = logging.getLogger(__name__)
@@ -47,8 +50,15 @@ class AgentManager:
         # Initialize and register contexts
         persona_context = PersonaContext()
         memory_context = MemoryContext()
+        time_context = TimeContext()
+        crypto_context = CryptoContext()
+        debug_context = DebugContext()
+
         agent.register_context(persona_context)
         agent.register_context(memory_context)
+        agent.register_context(time_context)
+        agent.register_context(crypto_context)
+        agent.register_context(debug_context)
 
         self.agents[user_id] = agent
         return agent
@@ -68,7 +78,6 @@ class AgentManager:
                 logger.info(f"Loaded agent for user {user_id}")
             except Exception as e:
                 import traceback
-                traceback.print_exc()
                 logger.error(f"Failed to load agent for user {user_id}: {e}")
                 agent = self.create_agent(user_id)
         else:
@@ -115,10 +124,16 @@ class AgentManager:
         try:
             if agent_path.exists():
                 agent_path.unlink()
+            
+            # Also remove any associated crypto keys
+            key_path = Path(os.getenv("KEYS_DIRECTORY", "secure/keys")) / f"{agent.identity.id}.key"
+            if key_path.exists():
+                key_path.unlink()
+                
             return True
         except Exception as e:
             logger.error(f"Failed to remove agent file for user {user_id}: {e}")
             return False
 
 # Global agent manager instance
-agent_manager = AgentManager() 
+agent_manager = AgentManager()
