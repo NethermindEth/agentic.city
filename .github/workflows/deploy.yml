@@ -87,6 +87,7 @@ jobs:
           POLLING_INTERVAL: '3.0'
           LOG_LEVEL: 'INFO'
           ETH_RPC_URL: ${{ secrets.ETH_RPC_URL }}
+          ADMIN_ID: ${{ secrets.ADMIN_ID }}
           KEYS_DIRECTORY: '/secure/keys'
         run: |
           # Write the private key to a file
@@ -118,6 +119,7 @@ jobs:
             echo "LOG_LEVEL=${LOG_LEVEL}" >> ~/telegram-bot/.env
             echo "ETH_RPC_URL=${ETH_RPC_URL}" >> ~/telegram-bot/.env
             echo "KEYS_DIRECTORY=${KEYS_DIRECTORY}" >> ~/telegram-bot/.env
+            echo "ADMIN_ID=${ADMIN_ID}" >> ~/telegram-bot/.env
             
             echo "Installing dependencies..."
             cd ~/telegram-bot
