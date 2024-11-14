@@ -34,6 +34,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "DISCLAIMER: trusted execution platform not built yet\n"
         "DISCLAIMER: blockchain support rudimentary\n"
         "DISCLAIMER: EXPECT TO LOOSE ALL YOUR ASSETS\n"
+        "DISCLAIMER: we will regularly reset the state of your agent\n"
         "----------------------------------------\n"
     )
     
