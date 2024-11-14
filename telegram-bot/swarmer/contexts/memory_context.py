@@ -1,11 +1,9 @@
-from typing import Optional, Dict, List, Tuple
+from typing import Optional, Dict, List
 from uuid import UUID, uuid4
-import json
 import time
 from dataclasses import dataclass
-from swarmer.tools.utils import function_to_schema, tool
+from swarmer.tools.utils import tool
 from swarmer.types import AgentIdentity, Context, Tool
-from swarmer.globals.agent_registry import agent_registry
 
 @dataclass
 class MemoryEntry:
@@ -15,34 +13,27 @@ class MemoryEntry:
         content (str): The actual memory content
         timestamp (float): When the memory was created/updated
         importance (int): Importance score (1-10)
-        category (str): Type of memory (e.g., "user_preference", "goal", "fact")
-        source (str): Where this memory came from (e.g., "user", "inference")
     """
     content: str
     timestamp: float
     importance: int
-    category: str
-    source: str
 
 class MemoryContext(Context):
     """Context for managing an agent's long-term memory.
 
     This context allows agents to store and retrieve important information across
-    conversations. Memories can include user preferences, conversation goals,
+    conversations. Memories can include user preferences, conversation history,
     learned facts, and other persistent information.
 
-    Memory entries should be concise and focused on truly important information.
-    Agents should actively maintain their memories by adding new insights and
-    updating existing ones."""
+    Memory entries should be concise and focused on truly important information."""
     
     tools: List[Tool] = []
-    # agent_id -> {memory_id -> MemoryEntry}
 
     def __init__(self) -> None:
         self.agent_memories: Dict[str, Dict[str, MemoryEntry]] = {}
         self.tools.extend([
             self.add_memory,
-            self.get_memories_by_category,
+            self.get_memories,
             self.update_memory,
             self.remove_memory
         ])
@@ -52,8 +43,8 @@ class MemoryContext(Context):
         return """
         # Memory
         You have access to a persistent memory system. Use it to maintain important
-        information across conversations. Use memory proactively. Anything you think
-        is relevant to rememeber, you should add to memory. Follow these guidelines:
+        information across conversations. Use memory proactively - anything you think
+        is relevant to remember, you should add to memory. Follow these guidelines:
 
         1. Memory Management:
            - Store concise, important facts about users and conversations
@@ -69,15 +60,9 @@ class MemoryContext(Context):
 
         3. Memory Quality:
            - Keep memories concise and specific
-           - Include source of information
-           - Rate importance appropriately
-           - Categorize memories properly
-
-        4. Categories:
-           - user_preference: User likes, dislikes, preferences
-           - goal: Active goals or tasks
-           - fact: General facts about the user or situation
-           - context: Important contextual information
+           - Rate importance appropriately (1-10)
+           - More important memories (8-10) should be key facts that significantly impact interactions
+           - Less important memories (1-4) can be minor preferences or temporary context
 
         Only mention memory capabilities if relevant to the conversation.
         """
@@ -88,19 +73,16 @@ class MemoryContext(Context):
         if not memories:
             return None
             
-        # Format memories by category
-        categorized: Dict[str, List[Tuple[str, str]]] = {}
-        for memory_id, memory in memories.items():
-            if memory.category not in categorized:
-                categorized[memory.category] = []
-            categorized[memory.category].append((memory_id, memory.content))
+        # Sort memories by importance
+        sorted_memories = sorted(
+            memories.items(),
+            key=lambda x: x[1].importance,
+            reverse=True
+        )
 
-        # Build context string
         context_parts = ["Current memories:"]
-        for category, items in categorized.items():
-            context_parts.append(f"\n{category.replace('_', ' ').title()}:")
-            for memory_id, content in items:
-                context_parts.append(f"- {content} (ID: {memory_id})")
+        for memory_id, memory in sorted_memories:
+            context_parts.append(f"- {memory.content} (ID: {memory_id}, Importance: {memory.importance})")
 
         return "\n".join(context_parts)
 
@@ -115,9 +97,7 @@ class MemoryContext(Context):
         self,
         agent_identity: AgentIdentity,
         content: str,
-        importance: int,
-        category: str,
-        source: str
+        importance: int
     ) -> str:
         """Add a new memory for the agent.
         
@@ -125,61 +105,46 @@ class MemoryContext(Context):
             agent_identity: The agent adding the memory
             content: The memory content (keep concise and specific)
             importance: Importance score (1-10)
-            category: Type of memory (user_preference, goal, fact, context)
-            source: Where this memory came from (user, inference)
             
         Returns:
             Confirmation message
         """
-
         if not 1 <= importance <= 10:
             return "Failed to add memory: Importance must be between 1 and 10"
-            
-        valid_categories = ["user_preference", "goal", "fact", "context"]
-        if category not in valid_categories:
-            return f"Failed to add memory: Category must be one of {valid_categories}"
 
         memory = MemoryEntry(
             content=content,
             timestamp=time.time(),
-            importance=importance,
-            category=category,
-            source=source
+            importance=importance
         )
         
         memory_id = str(uuid4())
         memories = self._get_agent_memories(agent_identity)
         memories[memory_id] = memory
         
-        return f"Added new memory (ID: {memory_id}):\nContent: {content}\nCategory: {category}\nImportance: {importance}"
+        return f"Added new memory (ID: {memory_id}):\nContent: {content}\nImportance: {importance}"
 
     @tool
-    def get_memories_by_category(
+    def get_memories(
         self,
         agent_identity: AgentIdentity,
-        category: str
     ) -> str:
-        """Retrieve all memories of a specific category.
+        """Retrieve all memories.
         
         Args:
             agent_identity: The agent retrieving memories
-            category: Category to filter by
             
         Returns:
-            Formatted string of matching memories
+            Formatted string of memories
         """
         memories = self._get_agent_memories(agent_identity)
-        matching = {
-            mid: m for mid, m in memories.items()
-            if m.category == category
-        }
         
-        if not matching:
-            return f"No memories found in category '{category}'"
+        if not memories:
+            return "No memories found"
         
-        result = [f"Found {len(matching)} memories in category '{category}':"]
-        for mid, memory in matching.items():
-            result.append(f"- {memory.content} (Importance: {memory.importance}, Source: {memory.source})")
+        result = [f"Found {len(memories)} memories:"]
+        for mid, memory in memories.items():
+            result.append(f"- {memory.content} (ID: {mid}, Importance: {memory.importance})")
         
         return "\n".join(result)
 
@@ -243,7 +208,7 @@ class MemoryContext(Context):
             
         memory = memories[memory_id]
         del memories[memory_id]
-        return f"Removed memory (ID: {memory_id}):\nContent: {memory.content}\nCategory: {memory.category}"
+        return f"Removed memory (ID: {memory_id}):\nContent: {memory.content}"
 
     def serialize(self) -> dict:
         """Serialize context state"""
@@ -254,8 +219,6 @@ class MemoryContext(Context):
                     memory_id: {
                         "content": memory.content,
                         "importance": memory.importance,
-                        "category": memory.category,
-                        "source": memory.source,
                         "timestamp": memory.timestamp
                     }
                     for memory_id, memory in memories.items()
