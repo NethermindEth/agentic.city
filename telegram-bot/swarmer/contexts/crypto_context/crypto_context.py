@@ -34,21 +34,6 @@ class CryptoContext(Context):
         self.keys_dir = Path(os.getenv("KEYS_DIRECTORY", "secure/keys"))
         self.keys_dir.mkdir(parents=True, exist_ok=True)
         self.private_keys: Dict[str, str] = {}
-        
-        # Load Uniswap ABI from package directory
-        abi_path = Path(__file__).parent / "abis/uniswap_router.json"
-        with open(abi_path) as f:
-            self.uniswap_abi = json.load(f)["abi"]
-
-        # Before the contract initialization, add a check for the router address
-        uniswap_router_address = os.getenv("UNISWAP_ROUTER")
-        if not uniswap_router_address:
-            raise ValueError("UNISWAP_ROUTER environment variable not set")
-
-        self.uniswap = self.w3.eth.contract(
-            address=Web3.to_checksum_address(uniswap_router_address),
-            abi=self.uniswap_abi
-        )
 
         # Setup faucet
         self.faucet_key_path = Path(os.getenv("KEYS_DIRECTORY", "secure/keys")) / "app.key"
