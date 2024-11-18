@@ -45,12 +45,11 @@ class MemoryContextUI(ContextDebugUI):
                 html += f"""
                 <div class="memory-entry">
                     <div class="memory-header">
-                        <span class="category">{memory.category}</span>
                         <span class="importance">Importance: {memory.importance}</span>
                     </div>
                     <div class="memory-content">{memory.content}</div>
                     <div class="memory-meta">
-                        Source: {memory.source} | ID: {memory_id}
+                        ID: {memory_id}
                     </div>
                 </div>
                 """
