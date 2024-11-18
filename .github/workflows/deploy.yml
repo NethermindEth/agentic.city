@@ -90,6 +90,8 @@ jobs:
           ADMIN_ID: ${{ secrets.ADMIN_ID }}
           KEYS_DIRECTORY: '/secure/keys'
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          AGENT_TOOLS_DIRECTORY: '/secure/agent_tools'
+
         run: |
           # Write the private key to a file
           echo "$PRIVATE_KEY" > private_key.pem
@@ -120,6 +122,7 @@ jobs:
             echo "LOG_LEVEL=${LOG_LEVEL}" >> ~/telegram-bot/.env
             echo "ETH_RPC_URL=${ETH_RPC_URL}" >> ~/telegram-bot/.env
             echo "KEYS_DIRECTORY=${KEYS_DIRECTORY}" >> ~/telegram-bot/.env
+            echo "AGENT_TOOLS_DIRECTORY=${AGENT_TOOLS_DIRECTORY}" >> ~/telegram-bot/.env
             echo "ADMIN_ID=${ADMIN_ID}" >> ~/telegram-bot/.env
             echo "SENTRY_DSN=${SENTRY_DSN}" >> ~/telegram-bot/.env
             
@@ -169,4 +172,8 @@ jobs:
             
             sudo chown -R $USERNAME:$USERNAME ~/telegram-bot/monitoring
             sudo chmod 755 ~/telegram-bot/monitoring
+
+            sudo mkdir -p ${AGENT_TOOLS_DIRECTORY}
+            sudo chown $USERNAME:$USERNAME ${AGENT_TOOLS_DIRECTORY}
+            sudo chmod 700 ${AGENT_TOOLS_DIRECTORY}
           EOF

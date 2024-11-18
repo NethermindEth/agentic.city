@@ -18,6 +18,43 @@ Contexts are fundamental building blocks in the Swarmer framework that provide a
 - Helps maintain conversation continuity
 - Enables learning from past experiences
 
+### ⚡ Tool Creation Context
+**Purpose**: Enables dynamic creation and management of tools
+- Allows agents to create new tools at runtime
+- Each agent has an isolated tools directory
+- Built-in code validation and safety checks
+- Tools persist across sessions
+- Automatic tool loading on startup
+
+Example usage:
+```python
+@tool
+def my_custom_tool(agent_identity: AgentIdentity, param1: str) -> str:
+    """Tool description here"""
+    return f"Result: {param1}"
+```
+
+### 🕒 Time Context
+**Purpose**: Provides time awareness and scheduling capabilities
+- Current time in various formats
+- Time conversion and calculations
+- Scheduling capabilities
+- Duration tracking
+
+### 💰 Crypto Context
+**Purpose**: Handles cryptocurrency operations
+- Wallet management
+- Balance checking
+- Transaction capabilities
+- DeFi interactions
+
+### 🔍 Debug Context
+**Purpose**: Provides debugging capabilities
+- Tool execution tracing
+- State inspection
+- Runtime debugging
+- Error tracking
+
 ## Creating New Contexts
 
 Contexts must implement the `Context` base class and provide:
@@ -46,6 +83,7 @@ tools: list[Tool] = []  # List of tools this context provides
 3. **Clear Instructions**: Provide clear guidelines for how agents should use the context
 4. **State Management**: Carefully manage any persistent state to avoid conflicts
 5. **Tool Design**: Design tools to be atomic and focused on specific operations
+6. **Security**: Implement proper validation and safety checks for dynamic capabilities
 
 ## Example: Creating a Custom Context
 

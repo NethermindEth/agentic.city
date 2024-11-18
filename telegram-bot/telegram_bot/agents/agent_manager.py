@@ -12,6 +12,7 @@ from swarmer.contexts.memory_context import MemoryContext
 from swarmer.contexts.time_context import TimeContext
 from swarmer.contexts.crypto_context import CryptoContext
 from swarmer.contexts.debug_context import DebugContext
+from swarmer.contexts.tool_creation_context import ToolCreationContext
 from swarmer.debug_ui.server import DebugUIServer
 
 logger = logging.getLogger(__name__)
@@ -81,12 +82,18 @@ class AgentManager:
         time_context = TimeContext()
         crypto_context = CryptoContext()
         debug_context = DebugContext()
+        tool_creation_context = ToolCreationContext()
 
         agent.register_context(persona_context)
         agent.register_context(memory_context)
         agent.register_context(time_context)
         agent.register_context(crypto_context)
         agent.register_context(debug_context)
+        agent.register_context(tool_creation_context)
+
+        # Create agent's tools directory
+        tools_dir = Path(os.getenv("AGENT_TOOLS_DIRECTORY", "agent_tools")) / agent.identity.id
+        tools_dir.mkdir(parents=True, exist_ok=True)
 
         self.agents[user_id] = agent
         return agent
@@ -104,6 +111,11 @@ class AgentManager:
                 self.agents[user_id] = agent
                 agent_registry.registry[agent.identity.id] = agent
                 logger.info(f"Loaded agent for user {user_id}")
+                
+                # Ensure tool directory exists after loading
+                tools_dir = Path(os.getenv("AGENT_TOOLS_DIRECTORY", "agent_tools")) / agent.identity.id
+                tools_dir.mkdir(parents=True, exist_ok=True)
+                
             except Exception as e:
                 import traceback
                 logger.error(f"Failed to load agent for user {user_id}: {e}")
@@ -157,6 +169,12 @@ class AgentManager:
             key_path = Path(os.getenv("KEYS_DIRECTORY", "secure/keys")) / f"{agent.identity.id}.key"
             if key_path.exists():
                 key_path.unlink()
+                
+            # Remove agent's tools directory
+            tools_dir = Path(os.getenv("AGENT_TOOLS_DIRECTORY", "agent_tools")) / agent.identity.id
+            if tools_dir.exists():
+                import shutil
+                shutil.rmtree(tools_dir)
                 
             return True
         except Exception as e:

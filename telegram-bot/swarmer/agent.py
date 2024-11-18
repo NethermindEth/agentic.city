@@ -6,6 +6,10 @@ from litellm import completion
 from swarmer.globals.agent_registry import agent_registry
 import uuid
 import logging
+from pathlib import Path
+import os
+import importlib.util
+import sys
 
 class Agent(AgentBase):
     @staticmethod
@@ -97,6 +101,7 @@ class Agent(AgentBase):
             "completion_tokens": 0,
             "total_tokens": 0
         }
+        self.load_user_tools()
 
     # -----
     # Tools
@@ -236,3 +241,33 @@ class Agent(AgentBase):
     def clear_message_log(self) -> None:
         """Clear the agent's message history"""
         self.message_log.clear()
+
+    def load_user_tools(self) -> None:
+        """Load all tools from the agent's tools directory."""
+        tools_dir = Path(os.getenv("AGENT_TOOLS_DIRECTORY", "agent_tools")) / self.identity.id
+        if not tools_dir.exists():
+            return
+            
+        for file in tools_dir.glob("*.py"):
+            if file.stem == "__init__":
+                continue
+                
+            try:
+                # Import the module with agent-specific namespace
+                module_name = f"{self.identity.id}.{file.stem}"
+                spec = importlib.util.spec_from_file_location(module_name, file)
+                if spec is None or spec.loader is None:
+                    continue
+                    
+                module = importlib.util.module_from_spec(spec)
+                sys.modules[module_name] = module
+                spec.loader.exec_module(module)
+                
+                # Register any tools found
+                for attr_name in dir(module):
+                    attr = getattr(module, attr_name)
+                    if hasattr(attr, "__tool_schema__"):
+                        self.register_tool(attr)
+                        
+            except Exception:
+                continue
