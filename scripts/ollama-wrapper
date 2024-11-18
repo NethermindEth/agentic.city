@@ -32,7 +32,7 @@ class ChatUtil:
 
     def chat(self):
         while True:
-            user_input = input("user: ").strip()
+            user_input = input("\nuser: ").strip()
             if user_input == "exit":
                 break
 
@@ -51,7 +51,7 @@ class ChatUtil:
             # This is probably off by one
             self.hash_tree[conversation_hash] = json.dumps(self.conversation_log)  # store the entire log in hash tree
 
-            print(self.model + ":", response["content"])
+            print("\n" + self.model + ":", response["content"])
         print(f"Conversation hash:\n\n\t\t{conversation_hash[:8]}...{conversation_hash[-8:]}")
 
         title = self.completion_api({
