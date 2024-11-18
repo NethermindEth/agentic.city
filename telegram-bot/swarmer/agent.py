@@ -5,6 +5,7 @@ from swarmer.globals.consitution import constitution
 from litellm import completion
 from swarmer.globals.agent_registry import agent_registry
 import uuid
+import logging
 
 class Agent(AgentBase):
     @staticmethod
@@ -127,76 +128,82 @@ class Agent(AgentBase):
     # -----
     def run_loop(self, user_input: str) -> List[Message]:
         """Run the agent loop."""
+        logger = logging.getLogger(__name__)
         user_message = Message(role="user", content=user_input)
 
-        system_message = Message(
-            role="system",
-            content="\n\n".join([
-                constitution.instruction,
-                *self.get_context_instructions()
-            ])
-        )
-
-        context_str = "\n\n".join(self.get_context())
-        context_message = Message(
-            role="system", 
-            content=f"Current context:\n\n{context_str}"
-        )
-
-        # print("\n=== Model ===")
-        # print(f"{self.model}")
-        
-        # print("\n=== Tool Schemas ===") 
-        # # Print first schema in detail, summarize others
-        # schemas = self.get_tool_schemas()
-        # if schemas:
-        #     print(f"{schemas[0]}")  # Print first one in full
-        #     if len(schemas) > 1:
-        #         print(f"...and {len(schemas)-1} more tool schemas")
-        # print("\n=== Messages ===")
-        # for msg in [system_message, *self.message_log, context_message, user_message]:
-        #     print(f"\n[{msg.role.upper()}]")
-        #     print(f"{msg.content}")
-        # print("\n")
-        response = completion(
-            model=self.model,
-            messages=[system_message, *self.message_log, context_message, user_message],
-            tools=self.get_tool_schemas(),
-        )
-
-        # Add token tracking
-        if response.usage:
-            self.token_usage["prompt_tokens"] += response.usage.prompt_tokens
-            self.token_usage["completion_tokens"] += response.usage.completion_tokens
-            self.token_usage["total_tokens"] += response.usage.total_tokens
-
-        message = response.choices[0].message
-
-        response_history = [message]
-
-        while response.choices[0].finish_reason == "tool_calls":
-            # TODO: handle in parallel
-            for tool_call in message.tool_calls:
-                tool_result = self.execute_tool_call(tool_call)
-                tool_result_message = Message(role="tool", content=tool_result, tool_call_id=tool_call.id)
-                response_history.append(tool_result_message)
+        try:
+            system_message = Message(
+                role="system",
+                content="\n\n".join([
+                    constitution.instruction,
+                    *self.get_context_instructions()
+                ])
+            )
 
             context_str = "\n\n".join(self.get_context())
             context_message = Message(
                 role="system", 
                 content=f"Current context:\n\n{context_str}"
             )
- 
+
+            logger.debug(f"Making completion request for agent {self.identity.id}")
             response = completion(
                 model=self.model,
-                messages=[system_message, *self.message_log, user_message, context_message, *response_history],
+                messages=[system_message, *self.message_log, context_message, user_message],
                 tools=self.get_tool_schemas(),
             )
+
+            # Add token tracking
+            if response.usage:
+                self.token_usage["prompt_tokens"] += response.usage.prompt_tokens
+                self.token_usage["completion_tokens"] += response.usage.completion_tokens
+                self.token_usage["total_tokens"] += response.usage.total_tokens
+
             message = response.choices[0].message
-            response_history.append(message)
-        
-        self.message_log += [user_message, *response_history]
-        return response_history
+            response_history = [message]
+
+            while response.choices[0].finish_reason == "tool_calls":
+                logger.debug(f"Processing tool calls for agent {self.identity.id}")
+                # TODO: handle in parallel
+                for tool_call in message.tool_calls:
+                    try:
+                        tool_result = self.execute_tool_call(tool_call)
+                        tool_result_message = Message(role="tool", content=tool_result, tool_call_id=tool_call.id)
+                        response_history.append(tool_result_message)
+                    except Exception as e:
+                        logger.error(f"Error executing tool call: {e}", exc_info=True)
+                        tool_result_message = Message(
+                            role="tool", 
+                            content=f"Error executing tool: {str(e)}", 
+                            tool_call_id=tool_call.id
+                        )
+                        response_history.append(tool_result_message)
+
+                context_str = "\n\n".join(self.get_context())
+                context_message = Message(
+                    role="system", 
+                    content=f"Current context:\n\n{context_str}"
+                )
+    
+                logger.debug(f"Making follow-up completion request for agent {self.identity.id}")
+                response = completion(
+                    model=self.model,
+                    messages=[system_message, *self.message_log, user_message, context_message, *response_history],
+                    tools=self.get_tool_schemas(),
+                )
+                message = response.choices[0].message
+                response_history.append(message)
+            
+            self.message_log += [user_message, *response_history]
+            return response_history
+
+        except Exception as e:
+            logger.error(f"Error in agent run loop: {e}", exc_info=True)
+            error_message = Message(
+                role="assistant",
+                content="I apologize, but I encountered an error processing your request. Please try again."
+            )
+            return [error_message]
 
     # TODO fix the tool_call type
     def execute_tool_call(self, tool_call: Any) -> str:

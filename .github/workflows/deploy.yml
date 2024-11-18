@@ -89,6 +89,7 @@ jobs:
           ETH_RPC_URL: ${{ secrets.ETH_RPC_URL }}
           ADMIN_ID: ${{ secrets.ADMIN_ID }}
           KEYS_DIRECTORY: '/secure/keys'
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
           # Write the private key to a file
           echo "$PRIVATE_KEY" > private_key.pem
@@ -120,6 +121,12 @@ jobs:
             echo "ETH_RPC_URL=${ETH_RPC_URL}" >> ~/telegram-bot/.env
             echo "KEYS_DIRECTORY=${KEYS_DIRECTORY}" >> ~/telegram-bot/.env
             echo "ADMIN_ID=${ADMIN_ID}" >> ~/telegram-bot/.env
+            echo "SENTRY_DSN=${SENTRY_DSN}" >> ~/telegram-bot/.env
+            
+            echo "Setting up directories..."
+            mkdir -p ~/telegram-bot/logs
+            mkdir -p ~/telegram-bot/backups
+            mkdir -p ~/telegram-bot/monitoring
             
             echo "Installing dependencies..."
             cd ~/telegram-bot
@@ -135,6 +142,12 @@ jobs:
             # Copy service file directly without modification
             sudo cp deployment/telegram-bot.service /etc/systemd/system/telegram-bot.service
             
+            echo "Setting up backup cron job..."
+            (crontab -l 2>/dev/null || true; echo "0 0 * * * ~/telegram-bot/scripts/backup.sh") | crontab -
+            
+            echo "Making scripts executable..."
+            chmod +x ~/telegram-bot/scripts/*.sh
+            
             echo "Starting service..."
             sudo systemctl daemon-reload
             sudo systemctl enable telegram-bot
@@ -143,7 +156,17 @@ jobs:
             echo "Checking service status..."
             sudo systemctl status telegram-bot --no-pager
             
-            # Create and secure keys directory
+            # Create and secure directories
             sudo mkdir -p ${KEYS_DIRECTORY}
             sudo chown $USERNAME:$USERNAME ${KEYS_DIRECTORY}
             sudo chmod 700 ${KEYS_DIRECTORY}
+            
+            sudo chown -R $USERNAME:$USERNAME ~/telegram-bot/logs
+            sudo chmod 755 ~/telegram-bot/logs
+            
+            sudo chown -R $USERNAME:$USERNAME ~/telegram-bot/backups
+            sudo chmod 755 ~/telegram-bot/backups
+            
+            sudo chown -R $USERNAME:$USERNAME ~/telegram-bot/monitoring
+            sudo chmod 755 ~/telegram-bot/monitoring
+          EOF

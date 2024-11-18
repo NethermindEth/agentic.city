@@ -56,17 +56,47 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     try:
         # Get or create agent for this user
+        logger.info(f"Getting/creating agent for user {user_id}")
         agent = agent_manager.get_or_create_agent(user_id)
+        
+        # Send typing action while processing
+        await update.message.chat.send_action('typing')
+        
+        logger.info(f"Running agent loop for user {user_id} with input: {text}")
         messages = agent.run_loop(text)
         
+        if not messages:
+            logger.warning(f"No response messages from agent for user {user_id}")
+            await update.message.reply_text(
+                "I apologize, but I didn't receive a proper response. Please try again."
+            )
+            return
+            
+        response_sent = False
         for message in messages:
             if message.role == "assistant" and message.content:
+                logger.info(f"Sending assistant message to user {user_id}")
                 await update.message.reply_text(message.content)
+                response_sent = True
             elif message.role == "tool":
                 # Format tool response nicely
+                logger.info(f"Sending tool result to user {user_id}")
                 tool_response = f"🔧 Tool Result:\n{message.content}"
                 await update.message.reply_text(tool_response)
+                response_sent = True
+        
+        # If no response was sent, send a default message
+        if not response_sent:
+            logger.warning(f"No valid response messages to send for user {user_id}")
+            await update.message.reply_text(
+                "I apologize, but I couldn't generate a proper response. Please try again."
+            )
                 
     except TelegramError as e:
-        logger.error(f"Error sending message: {e}")
-        await update.message.reply_text("Sorry, I encountered an error processing your message.") 
+        logger.error(f"Telegram error for user {user_id}: {e}")
+        await update.message.reply_text("Sorry, I encountered an error sending messages.")
+    except Exception as e:
+        logger.error(f"Error processing message for user {user_id}: {str(e)}", exc_info=True)
+        await update.message.reply_text(
+            "Sorry, I encountered an unexpected error processing your message. Please try again."
+        )

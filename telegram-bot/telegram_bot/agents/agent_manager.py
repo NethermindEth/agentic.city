@@ -1,10 +1,10 @@
 import os
 import json
 import logging
-from typing import Dict
+from typing import Dict, Optional
 from pathlib import Path
 import atexit
-from threading import Timer
+from threading import Timer, Event
 from swarmer.agent import Agent
 from swarmer.globals.agent_registry import agent_registry
 from swarmer.contexts.persona_context import PersonaContext
@@ -22,8 +22,10 @@ class AgentManager:
         self.save_dir = Path(save_dir)
         self.save_dir.mkdir(parents=True, exist_ok=True)
         self.autosave_interval = autosave_interval
+        self._stop_event = Event()
+        self._autosave_timer: Optional[Timer] = None
         self._setup_autosave()
-        atexit.register(self.save_all_agents)
+        atexit.register(self.shutdown)
 
         # Initialize debug UI if enabled
         self.debug_ui = DebugUIServer() if debug_ui else None
@@ -32,11 +34,37 @@ class AgentManager:
 
     def _setup_autosave(self) -> None:
         """Setup periodic autosave"""
+        if self._stop_event.is_set():
+            return
+            
         def schedule_next_save() -> None:
-            self.save_all_agents()
-            Timer(self.autosave_interval, schedule_next_save).start()
+            if not self._stop_event.is_set():
+                self.save_all_agents()
+                self._autosave_timer = Timer(self.autosave_interval, schedule_next_save)
+                self._autosave_timer.daemon = True
+                self._autosave_timer.start()
         
-        Timer(self.autosave_interval, schedule_next_save).start()
+        self._autosave_timer = Timer(self.autosave_interval, schedule_next_save)
+        self._autosave_timer.daemon = True
+        self._autosave_timer.start()
+
+    def shutdown(self) -> None:
+        """Gracefully shutdown the agent manager"""
+        logger.info("Shutting down AgentManager...")
+        self._stop_event.set()
+        
+        # Cancel autosave timer
+        if self._autosave_timer:
+            self._autosave_timer.cancel()
+        
+        # Final save
+        self.save_all_agents()
+        
+        # Shutdown debug UI
+        if self.debug_ui:
+            self.debug_ui.shutdown()
+        
+        logger.info("AgentManager shutdown complete")
 
     def get_agent_path(self, user_id: int) -> Path:
         """Get the file path for a user's agent"""
