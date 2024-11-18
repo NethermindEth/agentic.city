@@ -15,6 +15,9 @@ dill = "^0.3.9"
 eth-account = "^0.13.4"
 eth-typing = "^5.0.1"
 web3 = "^7.5.0"
+psutil = "^6.1.0"
+sentry-sdk = "^2.18.0"
+prometheus-client = "^0.21.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.0"

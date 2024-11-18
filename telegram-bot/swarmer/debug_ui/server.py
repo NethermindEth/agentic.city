@@ -301,6 +301,8 @@ class DebugUIServer:
         self.port = port
         self.agents: Dict[int, AgentBase] = {}
         self.app = Flask(__name__)
+        self.server_thread = None
+        self._stop_event = threading.Event()
         
         @self.app.route('/')
         def home() -> str:
@@ -402,7 +404,16 @@ class DebugUIServer:
     def start(self) -> None:
         """Start the debug UI server in a separate thread"""
         def run_server() -> None:
-            self.app.run(port=self.port, debug=False)
+            from werkzeug.serving import make_server
+            self.server = make_server('127.0.0.1', self.port, self.app)
+            self.server.serve_forever()
             
         self.server_thread = threading.Thread(target=run_server, daemon=True)
         self.server_thread.start()
+    
+    def shutdown(self) -> None:
+        """Shutdown the debug UI server"""
+        if hasattr(self, 'server'):
+            self.server.shutdown()
+            if self.server_thread and self.server_thread.is_alive():
+                self.server_thread.join(timeout=5.0)

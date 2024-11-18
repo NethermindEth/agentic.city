@@ -23,8 +23,15 @@ var/
 # Environment variables
 .env
 
-# Logs
+# Logs and monitoring
+logs/
 *.log
+monitoring/
+
+# Backups
+backups/
+*.tar.gz
+*.zip
 
 # IDE specific files
 .idea/
@@ -35,5 +42,13 @@ var/
 # Mypy
 .mypy_cache/
 
+# Project specific
 data/
 secure/
+
+# Poetry
+poetry.lock
+
+# System files
+.DS_Store
+Thumbs.db
