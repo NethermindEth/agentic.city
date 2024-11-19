@@ -14,8 +14,24 @@ Agentic.City aims to create a robust framework for autonomous agents that can:
 
 | Experiment | Description | Status |
 |------------|-------------|---------|
+| swarmer | Modular framework for building intelligent agents with context-based architecture, dynamic tool creation, and state persistence | 🟢 Active |
 | telegram-bot | Production-ready Telegram bot with command handling, rate limiting, and error handling | 🟡 In Progress |
 | scripts | Utility scripts including Ollama wrapper and HTTP request helpers | 🟡 In Progress |
+
+## Components
+
+### Swarmer Framework 🤖
+
+The core agent framework powering Agentic.City. Key features include:
+- Context-based architecture for modular agent capabilities
+- Dynamic tool creation and management
+- Agent identity and state persistence
+- Event handling and scheduling
+- Secure crypto operations
+
+[Learn more about Swarmer](./swarmer/README.md)
+
+### Telegram Bot 🤖
 
 ## Deployment 🚀
 
