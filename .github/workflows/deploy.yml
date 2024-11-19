@@ -18,6 +18,7 @@ on:
       - develop
     paths:
       - 'telegram-bot/**'
+      - 'swarmer/**'
       - '.github/workflows/deploy.yml'
 
 jobs:
@@ -69,6 +70,10 @@ jobs:
         working-directory: ./swarmer
         run: poetry run mypy --no-incremental swarmer/
 
+      - name: Build swarmer wheel
+        working-directory: ./swarmer
+        run: poetry build -f wheel
+
       - name: Install dependencies (telegram-bot)
         working-directory: ./telegram-bot
         run: poetry install
@@ -77,11 +82,24 @@ jobs:
         working-directory: ./telegram-bot
         run: poetry run mypy --no-incremental telegram_bot/
         
+      - name: Clean mypy cache
+        run: |
+          rm -rf ./swarmer/.mypy_cache
+          rm -rf ./telegram-bot/.mypy_cache
+        
       - name: Build deployment package
         working-directory: ./telegram-bot
         run: |
+          # Export requirements excluding swarmer
           poetry export -f requirements.txt --output requirements.txt --without-hashes
-          zip -r deployment.zip . -x "*.git*" -x "*.pytest_cache*" -x "*__pycache__*" -x "*.env*"
+          # Copy swarmer wheel to deployment
+          mkdir -p wheels/
+          cp ../swarmer/dist/*.whl wheels/
+          # Update requirements.txt to use local wheel
+          WHEEL_FILE=$(ls wheels/*.whl)
+          echo "wheels/$WHEEL_FILE" >> requirements.txt
+          # Create deployment zip
+          zip -r deployment.zip . -x "*.git*" -x "*.pytest_cache*" -x "*__pycache__*" -x "*.env*" -x "*.mypy_cache*"
           
       - name: Deploy to AWS EC2
         env:
