@@ -2,7 +2,7 @@ from typing import Optional
 from uuid import uuid4
 import time
 from datetime import datetime, timezone
-from swarmer.tools.utils import tool
+from swarmer.tools.utils import tool, ToolResponse
 from swarmer.types import AgentIdentity, Context, Tool
 
 class TimeContext(Context):
@@ -48,7 +48,7 @@ class TimeContext(Context):
         return f"Current UTC time: {current_time.strftime('%Y-%m-%d %H:%M:%S')}"
 
     @tool
-    def get_current_time(self, agent_identity: AgentIdentity, format: str = "iso") -> str:
+    def get_current_time(self, agent_identity: AgentIdentity, format: str = "iso") -> ToolResponse:
         """Get the current time in UTC.
         
         Args:
@@ -56,16 +56,48 @@ class TimeContext(Context):
             format: Output format ('iso', 'unix', or 'human')
             
         Returns:
-            Current time in requested format
+            ToolResponse containing the current time in requested format
         """
         now = datetime.now(timezone.utc)
         
-        if format == "unix":
-            return f"Current Unix timestamp: {int(now.timestamp())}"
-        elif format == "human":
-            return f"Current time (UTC): {now.strftime('%B %d, %Y %H:%M:%S')}"
-        else:  # iso format
-            return f"Current ISO time: {now.isoformat()}"
+        try:
+            if format == "unix":
+                unix_time = int(now.timestamp())
+                return ToolResponse(
+                    summary=f"Current Unix timestamp: {unix_time}",
+                    content={
+                        "timestamp": unix_time,
+                        "format": "unix"
+                    },
+                    error=None
+                )
+            elif format == "human":
+                human_time = now.strftime('%B %d, %Y %H:%M:%S')
+                return ToolResponse(
+                    summary=f"Current time (UTC): {human_time}",
+                    content={
+                        "time": human_time,
+                        "format": "human"
+                    },
+                    error=None
+                )
+            else:  # iso format
+                iso_time = now.isoformat()
+                return ToolResponse(
+                    summary=f"Current ISO time: {iso_time}",
+                    content={
+                        "time": iso_time,
+                        "format": "iso"
+                    },
+                    error=None
+                )
+        except Exception as e:
+            error_msg = f"Error getting current time: {str(e)}"
+            return ToolResponse(
+                summary=error_msg,
+                content=None,
+                error=error_msg
+            )
 
     @tool
     def format_timestamp(
@@ -73,7 +105,7 @@ class TimeContext(Context):
         agent_identity: AgentIdentity,
         timestamp: float,
         format: str = "human"
-    ) -> str:
+    ) -> ToolResponse:
         """Format a Unix timestamp into a human-readable string.
         
         Args:
@@ -82,16 +114,39 @@ class TimeContext(Context):
             format: Output format ('iso', 'human')
             
         Returns:
-            Formatted time string
+            ToolResponse containing the formatted time string
         """
         try:
             dt = datetime.fromtimestamp(timestamp, timezone.utc)
             if format == "iso":
-                return f"Formatted time: {dt.isoformat()}"
+                iso_time = dt.isoformat()
+                return ToolResponse(
+                    summary=f"Formatted time: {iso_time}",
+                    content={
+                        "time": iso_time,
+                        "format": "iso",
+                        "input_timestamp": timestamp
+                    },
+                    error=None
+                )
             else:  # human
-                return f"Formatted time: {dt.strftime('%B %d, %Y %H:%M:%S')} UTC"
+                human_time = dt.strftime('%B %d, %Y %H:%M:%S')
+                return ToolResponse(
+                    summary=f"Formatted time: {human_time} UTC",
+                    content={
+                        "time": human_time,
+                        "format": "human",
+                        "input_timestamp": timestamp
+                    },
+                    error=None
+                )
         except ValueError as e:
-            return f"Error formatting timestamp: {str(e)}"
+            error_msg = f"Error formatting timestamp: {str(e)}"
+            return ToolResponse(
+                summary=error_msg,
+                content=None,
+                error=error_msg
+            )
 
     @tool
     def get_time_difference(
@@ -99,8 +154,8 @@ class TimeContext(Context):
         agent_identity: AgentIdentity,
         timestamp1: float,
         timestamp2: float
-    ) -> str:
-        """Calculate the difference between two timestamps.
+    ) -> ToolResponse:
+        """Calculate the difference between two Unix timestamps.
         
         Args:
             agent_identity: The agent requesting the calculation
@@ -108,7 +163,7 @@ class TimeContext(Context):
             timestamp2: Second Unix timestamp
             
         Returns:
-            Time difference in a human-readable format
+            ToolResponse containing the time difference in seconds and a human-readable format
         """
         try:
             diff_seconds = abs(timestamp2 - timestamp1)
@@ -119,19 +174,43 @@ class TimeContext(Context):
             minutes = int(remaining // 60)
             seconds = int(remaining % 60)
             
-            parts = []
+            human_diff = []
             if days > 0:
-                parts.append(f"{days} days")
+                human_diff.append(f"{days} days")
             if hours > 0:
-                parts.append(f"{hours} hours")
+                human_diff.append(f"{hours} hours")
             if minutes > 0:
-                parts.append(f"{minutes} minutes")
-            if seconds > 0 or not parts:
-                parts.append(f"{seconds} seconds")
+                human_diff.append(f"{minutes} minutes")
+            if seconds > 0 or not human_diff:
+                human_diff.append(f"{seconds} seconds")
                 
-            return f"Time difference: {', '.join(parts)}"
-        except ValueError as e:
-            return f"Error calculating time difference: {str(e)}"
+            human_readable = ", ".join(human_diff)
+            
+            return ToolResponse(
+                summary=f"Time difference: {human_readable}",
+                content={
+                    "difference_seconds": diff_seconds,
+                    "human_readable": human_readable,
+                    "components": {
+                        "days": days,
+                        "hours": hours,
+                        "minutes": minutes,
+                        "seconds": seconds
+                    },
+                    "timestamps": {
+                        "first": timestamp1,
+                        "second": timestamp2
+                    }
+                },
+                error=None
+            )
+        except Exception as e:
+            error_msg = f"Error calculating time difference: {str(e)}"
+            return ToolResponse(
+                summary=error_msg,
+                content=None,
+                error=error_msg
+            )
 
     def serialize(self) -> dict:
         """Serialize context state - TimeContext is stateless."""

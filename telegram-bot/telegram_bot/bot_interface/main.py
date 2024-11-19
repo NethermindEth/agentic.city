@@ -1,14 +1,19 @@
 import logging
 import sys
-from typing import Optional
+from typing import Optional, Any, cast, Callable, Coroutine
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
     filters,
+    CallbackContext,
+    ExtBot,
+    Updater,
 )
+from telegram import Update
 from telegram.error import TelegramError
 import asyncio
+from asyncio import Task
 import signal
 
 from .config import config
@@ -21,6 +26,7 @@ from .commands.dump import dump_command
 from .commands.remove_agent import remove_agent_command
 from .commands.tools import tools_command
 from .commands.health import health_command
+from .commands.inspect import inspect_command
 from .handlers.message_handler import handle_message
 from .handlers.error_handler import error_handler
 from telegram_bot.agents.agent_manager import agent_manager
@@ -61,13 +67,22 @@ async def create_application() -> Application:
     application.add_handler(CommandHandler('remove_agent', remove_agent_command))
     application.add_handler(CommandHandler('tools', tools_command))
     application.add_handler(CommandHandler('health', health_command))
+    application.add_handler(CommandHandler('inspect', inspect_command))
     
     # Add message handler
     logger.info("Registering message handler...")
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     # Add error handler
-    application.add_error_handler(error_handler)
+    application.add_error_handler(
+        cast(
+            Callable[
+                [object, CallbackContext[ExtBot[None], dict[Any, Any], dict[Any, Any], dict[Any, Any]]],
+                Coroutine[Any, Any, None]
+            ],
+            error_handler
+        )
+    )
     
     # Test connection
     logger.info("Testing bot connection...")
@@ -82,61 +97,14 @@ async def create_application() -> Application:
 
 async def shutdown(app: Application) -> None:
     """Gracefully shutdown the bot"""
-    logger.info("Received shutdown signal, initiating graceful shutdown...")
-    
+    logger.info("Shutting down bot...")
     try:
-        # Stop the updater first
-        if app.updater:
-            logger.info("Stopping updater...")
-            try:
-                # Don't wait for final get_updates during shutdown
-                app.updater._last_update_id = None  # Skip final update check
-                await asyncio.wait_for(app.updater.stop(), timeout=2.0)
-            except asyncio.TimeoutError:
-                logger.warning("Updater stop timed out")
-            except Exception as e:
-                logger.error(f"Error stopping updater: {e}", exc_info=True)
-        
-        # Stop the application
-        logger.info("Stopping application...")
-        try:
-            await asyncio.wait_for(app.stop(), timeout=2.0)
-            logger.info("Application.stop() complete")
-        except asyncio.TimeoutError:
-            logger.warning("Application stop timed out")
-        except Exception as e:
-            logger.error(f"Error stopping application: {e}", exc_info=True)
-        
-        # Close the bot if it exists
-        if app.bot:
-            logger.info("Closing bot...")
-            try:
-                # Skip close webhook call if we hit flood control
-                if hasattr(app.bot, '_close_pool'):
-                    await asyncio.wait_for(app.bot._close_pool(), timeout=2.0)
-            except Exception as e:
-                logger.error(f"Error closing bot connection pool: {e}", exc_info=True)
-        
-        # Cleanup the application
-        logger.info("Cleaning up application...")
-        try:
-            await asyncio.wait_for(app.shutdown(), timeout=2.0)
-        except asyncio.TimeoutError:
-            logger.warning("Application shutdown timed out")
-        except Exception as e:
-            logger.error(f"Error during application shutdown: {e}", exc_info=True)
-        
-        # Cleanup the agent manager
-        logger.info("Cleaning up agent manager...")
-        try:
-            agent_manager.shutdown()
-        except Exception as e:
-            logger.error(f"Error during agent manager shutdown: {e}", exc_info=True)
-        
+        if app.updater and app.updater.running:
+            await app.updater.stop()
+        await app.stop()
+        await app.shutdown()
     except Exception as e:
         logger.error(f"Error during shutdown: {e}", exc_info=True)
-    finally:
-        logger.info("Bot shutdown complete")
 
 async def run_bot() -> None:
     """Start the bot with proper error handling"""
@@ -153,16 +121,36 @@ async def run_bot() -> None:
         logger.info(f"- Polling Interval: {config.POLLING_INTERVAL}")
         logger.info(f"- Log Level: {config.LOG_LEVEL}")
         
+        # Set up signal handlers for graceful shutdown
+        loop = asyncio.get_event_loop()
+        
+        async def handle_signal(sig: int, app: Application) -> None:
+            """Handle shutdown signal"""
+            await shutdown(app)
+            
+        def create_signal_handler(sig: int) -> Callable[[], None]:
+            """Create a signal handler function with proper type hints"""
+            def handler() -> None:
+                asyncio.create_task(handle_signal(sig, app))
+            return handler
+            
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, create_signal_handler(sig))
+        
         # Start polling
         logger.info("Starting message polling...")
         await app.initialize()
         await app.start()
+        
+        if app.updater is None:
+            raise RuntimeError("Updater not initialized")
+            
         await app.updater.start_polling(poll_interval=config.POLLING_INTERVAL)
         
         # Keep the application running
         stop_signal = asyncio.Event()
         
-        def signal_handler():
+        def signal_handler() -> None:
             logger.info("Received stop signal")
             asyncio.create_task(shutdown(app))
             stop_signal.set()

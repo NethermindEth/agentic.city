@@ -301,7 +301,7 @@ class DebugUIServer:
         self.port = port
         self.agents: Dict[int, AgentBase] = {}
         self.app = Flask(__name__)
-        self.server_thread = None
+        self.server_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         
         @self.app.route('/')
@@ -415,5 +415,5 @@ class DebugUIServer:
         """Shutdown the debug UI server"""
         if hasattr(self, 'server'):
             self.server.shutdown()
-            if self.server_thread and self.server_thread.is_alive():
-                self.server_thread.join(timeout=5.0)
+        if self.server_thread is not None and self.server_thread.is_alive():
+            self.server_thread.join(timeout=5.0)

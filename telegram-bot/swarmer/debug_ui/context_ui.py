@@ -2,10 +2,12 @@ from abc import ABC, abstractmethod
 from swarmer.contexts.persona_context import PersonaContext
 from swarmer.contexts.memory_context import MemoryContext
 from swarmer.contexts.crypto_context import CryptoContext
+from swarmer.contexts.tool_creation_context import ToolCreationContext
 from typing import TYPE_CHECKING, Optional
+import json
 
 if TYPE_CHECKING:
-    from swarmer.types import Context
+    from swarmer.types import Context, Message
 
 class ContextDebugUI(ABC):
     """Base class for context-specific debug UI components"""
@@ -24,7 +26,36 @@ class ContextDebugUI(ABC):
             return PersonaContextUI(context)
         elif isinstance(context, CryptoContext):
             return CryptoContextUI(context)
+        elif isinstance(context, ToolCreationContext):
+            return ToolCreationContextUI(context)
         return None
+
+    @staticmethod
+    def render_message(message: 'Message') -> str:
+        """Render a message with tool call information"""
+        html = f"<div class='message {message.role}'>"
+        html += f"<div class='message-header'>{message.role.upper()}</div>"
+        
+        # Handle tool calls
+        if hasattr(message, 'tool_calls') and message.tool_calls:
+            html += "<div class='tool-calls'>"
+            for tool_call in message.tool_calls:
+                html += f"""
+                <div class='tool-call'>
+                    <div class='tool-name'>{tool_call.function.name}</div>
+                    <pre class='tool-args'>{json.dumps(json.loads(tool_call.function.arguments), indent=2)}</pre>
+                </div>
+                """
+            html += "</div>"
+            
+        # Handle tool results
+        if message.role == "tool":
+            html += f"<div class='tool-result'><pre>{message.content}</pre></div>"
+        else:
+            html += f"<div class='message-content'>{message.content}</div>"
+            
+        html += "</div>"
+        return html
 
 class MemoryContextUI(ContextDebugUI):
     def __init__(self, context: MemoryContext):
@@ -113,50 +144,112 @@ class CryptoContextUI(ContextDebugUI):
                 </div>
             </div>
         </div>
+        """
 
+class ToolCreationContextUI(ContextDebugUI):
+    def __init__(self, context: ToolCreationContext):
+        self.context = context
+        
+    def render(self) -> str:
+        html = """
+        <div class="context-section tool-creation-context">
+            <h3>Tool Creation Context</h3>
+            <div class="tools">
+        """
+        
+        # Group tools by agent
+        for agent_dir in self.context.base_tools_dir.glob("*"):
+            if not agent_dir.is_dir():
+                continue
+                
+            agent_id = agent_dir.name
+            html += f"<div class='agent-tools'><h4>Agent: {agent_id}</h4>"
+            
+            # List tools for this agent
+            tools = []
+            for tool_file in agent_dir.glob("*.py"):
+                with open(tool_file, 'r') as f:
+                    code = f.read()
+                tools.append((tool_file.stem, code))
+            
+            for tool_name, code in tools:
+                html += f"""
+                <div class="tool-entry">
+                    <div class="tool-header">
+                        <span class="tool-name">{tool_name}</span>
+                        <button onclick="copyToolCode('{tool_name}')" class="copy-btn">
+                            📋 Copy Code
+                        </button>
+                    </div>
+                    <pre class="tool-code" id="code-{tool_name}">{code}</pre>
+                </div>
+                """
+            
+            html += "</div>"
+            
+        html += """
+        </div></div>
+        
         <style>
-            .faucet-info {{
-                background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+            .tool-creation-context .tool-entry {
+                background: #1a1a1a;
                 border-radius: 8px;
-                padding: 20px;
                 margin: 10px 0;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            }}
-            .address-box {{
+                padding: 15px;
+            }
+            .tool-header {
                 display: flex;
+                justify-content: space-between;
                 align-items: center;
+                margin-bottom: 10px;
+            }
+            .tool-name {
+                font-weight: bold;
+                color: #00ff00;
+            }
+            .tool-code {
                 background: #000;
                 padding: 10px;
                 border-radius: 4px;
+                overflow-x: auto;
+            }
+            .message .tool-calls {
+                background: #2a2a2a;
+                border-left: 3px solid #00ff00;
                 margin: 10px 0;
-            }}
-            .copy-btn {{
-                margin-left: 10px;
-                padding: 5px 10px;
-                border: none;
-                border-radius: 4px;
-                background: #444;
-                color: white;
-                cursor: pointer;
-            }}
-            .copy-btn:hover {{
-                background: #555;
-            }}
-            .faucet-balance {{
+                padding: 10px;
+            }
+            .message .tool-call {
+                margin: 5px 0;
+            }
+            .message .tool-name {
                 color: #00ff00;
                 font-weight: bold;
-            }}
+            }
+            .message .tool-args {
+                background: #1a1a1a;
+                padding: 8px;
+                border-radius: 4px;
+                margin: 5px 0;
+            }
+            .message .tool-result {
+                background: #1a1a1a;
+                border-left: 3px solid #0088ff;
+                padding: 10px;
+                margin: 5px 0;
+            }
         </style>
         
         <script>
-            function copyToClipboard(elementId) {{
-                const text = document.getElementById(elementId).textContent;
-                navigator.clipboard.writeText(text);
+            function copyToolCode(toolName) {
+                const code = document.getElementById(`code-${toolName}`).textContent;
+                navigator.clipboard.writeText(code);
                 
                 const btn = event.target;
                 const originalText = btn.textContent;
                 btn.textContent = '✓ Copied!';
                 setTimeout(() => btn.textContent = originalText, 2000);
-            }}
+            }
         </script>
         """
+        return html

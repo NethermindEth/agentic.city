@@ -1,5 +1,5 @@
 import logging
-from typing import Dict
+from typing import Dict, List
 from collections import defaultdict
 from datetime import datetime, timedelta
 from telegram import Update
@@ -13,7 +13,49 @@ logger = logging.getLogger(__name__)
 # Rate limiting
 MESSAGE_RATE_LIMIT = 5  # messages
 RATE_LIMIT_PERIOD = 60  # seconds
+# Telegram message length limit (slightly under actual limit for safety)
+MAX_MESSAGE_LENGTH = 4000
 user_message_counts: Dict[int, list] = defaultdict(list)
+
+def split_long_message(text: str) -> List[str]:
+    """Split a long message into chunks that fit within Telegram's message length limit.
+    
+    Args:
+        text: The message text to split
+        
+    Returns:
+        List of message chunks
+    """
+    if len(text) <= MAX_MESSAGE_LENGTH:
+        return [text]
+        
+    chunks = []
+    current_chunk = ""
+    
+    # Split by newlines first to preserve formatting
+    lines = text.split('\n')
+    
+    for line in lines:
+        # If single line is too long, split by spaces
+        if len(line) > MAX_MESSAGE_LENGTH:
+            words = line.split(' ')
+            for word in words:
+                if len(current_chunk) + len(word) + 1 > MAX_MESSAGE_LENGTH:
+                    chunks.append(current_chunk.strip())
+                    current_chunk = word + ' '
+                else:
+                    current_chunk += word + ' '
+        # Otherwise try to add the whole line
+        elif len(current_chunk) + len(line) + 1 > MAX_MESSAGE_LENGTH:
+            chunks.append(current_chunk.strip())
+            current_chunk = line + '\n'
+        else:
+            current_chunk += line + '\n'
+    
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+    
+    return chunks
 
 def check_rate_limit(user_id: int) -> bool:
     """Check if user has exceeded rate limit"""
@@ -76,13 +118,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         for message in messages:
             if message.role == "assistant" and message.content:
                 logger.info(f"Sending assistant message to user {user_id}")
-                await update.message.reply_text(message.content)
+                # Split long messages
+                chunks = split_long_message(message.content)
+                for chunk in chunks:
+                    await update.message.reply_text(chunk)
                 response_sent = True
             elif message.role == "tool":
-                # Format tool response nicely
+                # Format and split tool response
                 logger.info(f"Sending tool result to user {user_id}")
-                tool_response = f"🔧 Tool Result:\n{message.content}"
-                await update.message.reply_text(tool_response)
+                # Get tool name from message
+                tool_name = message.name if hasattr(message, 'name') else "Unknown Tool"
+                
+                tool_response = f"🔧 Tool: {tool_name}\n📋 Result: {message.content}"
+                chunks = split_long_message(tool_response)
+                for chunk in chunks:
+                    await update.message.reply_text(chunk)
                 response_sent = True
         
         # If no response was sent, send a default message

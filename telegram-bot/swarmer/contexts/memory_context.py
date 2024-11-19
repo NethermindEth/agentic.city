@@ -2,7 +2,7 @@ from typing import Optional, Dict, List
 from uuid import UUID, uuid4
 import time
 from dataclasses import dataclass
-from swarmer.tools.utils import tool
+from swarmer.tools.utils import tool, ToolResponse
 from swarmer.types import AgentIdentity, Context, Tool
 
 @dataclass
@@ -17,6 +17,14 @@ class MemoryEntry:
     content: str
     timestamp: float
     importance: int
+
+    def to_dict(self) -> dict:
+        """Convert memory entry to dictionary."""
+        return {
+            "content": self.content,
+            "timestamp": self.timestamp,
+            "importance": self.importance
+        }
 
 class MemoryContext(Context):
     """Context for managing an agent's long-term memory.
@@ -98,7 +106,7 @@ class MemoryContext(Context):
         agent_identity: AgentIdentity,
         content: str,
         importance: int
-    ) -> str:
+    ) -> ToolResponse:
         """Add a new memory for the agent.
         
         Args:
@@ -107,46 +115,95 @@ class MemoryContext(Context):
             importance: Importance score (1-10)
             
         Returns:
-            Confirmation message
+            ToolResponse containing the new memory details
         """
         if not 1 <= importance <= 10:
-            return "Failed to add memory: Importance must be between 1 and 10"
+            error_msg = "Failed to add memory: Importance must be between 1 and 10"
+            return ToolResponse(
+                summary=error_msg,
+                content=None,
+                error=error_msg
+            )
 
-        memory = MemoryEntry(
-            content=content,
-            timestamp=time.time(),
-            importance=importance
-        )
-        
-        memory_id = str(uuid4())
-        memories = self._get_agent_memories(agent_identity)
-        memories[memory_id] = memory
-        
-        return f"Added new memory (ID: {memory_id}):\nContent: {content}\nImportance: {importance}"
+        try:
+            memory = MemoryEntry(
+                content=content,
+                timestamp=time.time(),
+                importance=importance
+            )
+            
+            memory_id = str(uuid4())
+            memories = self._get_agent_memories(agent_identity)
+            memories[memory_id] = memory
+            
+            success_msg = f"Added new memory: {content} (Importance: {importance})"
+            return ToolResponse(
+                summary=success_msg,
+                content={
+                    "status": "success",
+                    "memory": {
+                        "id": memory_id,
+                        **memory.to_dict()
+                    }
+                },
+                error=None
+            )
+        except Exception as e:
+            error_msg = f"Failed to add memory: {str(e)}"
+            return ToolResponse(
+                summary=error_msg,
+                content=None,
+                error=error_msg
+            )
 
     @tool
     def get_memories(
         self,
         agent_identity: AgentIdentity,
-    ) -> str:
+    ) -> ToolResponse:
         """Retrieve all memories.
         
         Args:
             agent_identity: The agent retrieving memories
             
         Returns:
-            Formatted string of memories
+            ToolResponse containing all memories
         """
-        memories = self._get_agent_memories(agent_identity)
-        
-        if not memories:
-            return "No memories found"
-        
-        result = [f"Found {len(memories)} memories:"]
-        for mid, memory in memories.items():
-            result.append(f"- {memory.content} (ID: {mid}, Importance: {memory.importance})")
-        
-        return "\n".join(result)
+        try:
+            memories = self._get_agent_memories(agent_identity)
+            
+            if not memories:
+                return ToolResponse(
+                    summary="No memories found",
+                    content={"memories": []},
+                    error=None
+                )
+            
+            memory_list = []
+            summary_items = []
+            for mid, memory in memories.items():
+                memory_list.append({
+                    "id": mid,
+                    **memory.to_dict()
+                })
+                summary_items.append(f"- {memory.content} (Importance: {memory.importance})")
+            
+            summary = f"Found {len(memories)} memories:\n" + "\n".join(summary_items)
+            return ToolResponse(
+                summary=summary,
+                content={
+                    "count": len(memories),
+                    "memories": memory_list
+                },
+                error=None
+            )
+        except Exception as e:
+            error_msg = f"Failed to retrieve memories: {str(e)}"
+            return ToolResponse(
+                summary=error_msg,
+                content=None,
+                error=error_msg
+            )
 
     @tool
     def update_memory(
@@ -155,7 +212,7 @@ class MemoryContext(Context):
         memory_id: str,
         content: str,
         importance: Optional[int] = None
-    ) -> str:
+    ) -> ToolResponse:
         """Update an existing memory.
         
         Args:
@@ -165,34 +222,74 @@ class MemoryContext(Context):
             importance: New importance score (optional)
             
         Returns:
-            Confirmation message
+            ToolResponse containing the updated memory details
         """
-        memories = self._get_agent_memories(agent_identity)
-        if memory_id not in memories:
-            return f"Failed to update: Memory {memory_id} not found"
+        try:
+            memories = self._get_agent_memories(agent_identity)
+            if memory_id not in memories:
+                error_msg = f"Failed to update: Memory {memory_id} not found"
+                return ToolResponse(
+                    summary=error_msg,
+                    content=None,
+                    error=error_msg
+                )
+                
+            memory = memories[memory_id]
+            changes = {
+                "old": memory.to_dict(),
+                "new": {}
+            }
             
-        memory = memories[memory_id]
-        old_content = memory.content
-        memory.content = content
-        memory.timestamp = time.time()
-        
-        changes = [f"Content: {old_content} → {content}"]
-        
-        if importance is not None:
-            if not 1 <= importance <= 10:
-                return "Failed to update: Importance must be between 1 and 10"
-            old_importance = memory.importance
-            memory.importance = importance
-            changes.append(f"Importance: {old_importance} → {importance}")
+            # Update content
+            old_content = memory.content
+            memory.content = content
+            memory.timestamp = time.time()
+            changes["new"]["content"] = content
             
-        return f"Updated memory (ID: {memory_id}):\n" + "\n".join(changes)
+            # Update importance if provided
+            if importance is not None:
+                if not 1 <= importance <= 10:
+                    error_msg = "Failed to update: Importance must be between 1 and 10"
+                    return ToolResponse(
+                        summary=error_msg,
+                        content=None,
+                        error=error_msg
+                    )
+                old_importance = memory.importance
+                memory.importance = importance
+                changes["new"]["importance"] = importance
+            else:
+                changes["new"]["importance"] = memory.importance
+                
+            changes["new"]["timestamp"] = memory.timestamp
+            
+            summary = f"Updated memory: {content}"
+            if importance is not None:
+                summary += f" (Importance: {importance})"
+                
+            return ToolResponse(
+                summary=summary,
+                content={
+                    "status": "success",
+                    "memory_id": memory_id,
+                    "changes": changes
+                },
+                error=None
+            )
+        except Exception as e:
+            error_msg = f"Failed to update memory: {str(e)}"
+            return ToolResponse(
+                summary=error_msg,
+                content=None,
+                error=error_msg
+            )
 
     @tool
     def remove_memory(
         self,
         agent_identity: AgentIdentity,
         memory_id: str
-    ) -> str:
+    ) -> ToolResponse:
         """Remove a memory.
         
         Args:
@@ -200,15 +297,39 @@ class MemoryContext(Context):
             memory_id: ID of the memory to remove
             
         Returns:
-            Confirmation message
+            ToolResponse containing the status of the removal operation
         """
-        memories = self._get_agent_memories(agent_identity)
-        if memory_id not in memories:
-            return f"Failed to remove: Memory {memory_id} not found"
+        try:
+            memories = self._get_agent_memories(agent_identity)
+            if memory_id not in memories:
+                error_msg = f"Failed to remove: Memory {memory_id} not found"
+                return ToolResponse(
+                    summary=error_msg,
+                    content=None,
+                    error=error_msg
+                )
+                
+            memory = memories[memory_id]
+            del memories[memory_id]
             
-        memory = memories[memory_id]
-        del memories[memory_id]
-        return f"Removed memory (ID: {memory_id}):\nContent: {memory.content}"
+            return ToolResponse(
+                summary=f"Removed memory: {memory.content}",
+                content={
+                    "status": "success",
+                    "removed_memory": {
+                        "id": memory_id,
+                        **memory.to_dict()
+                    }
+                },
+                error=None
+            )
+        except Exception as e:
+            error_msg = f"Failed to remove memory: {str(e)}"
+            return ToolResponse(
+                summary=error_msg,
+                content=None,
+                error=error_msg
+            )
 
     def serialize(self) -> dict:
         """Serialize context state"""

@@ -1,6 +1,6 @@
 import logging
 import traceback
-from typing import Optional
+from typing import Optional, cast
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.error import (
@@ -19,6 +19,10 @@ async def error_handler(update: Optional[Update], context: ContextTypes.DEFAULT_
     
     # Extract error information
     error = context.error
+    if error is None:
+        logger.error("No error found in context")
+        return
+        
     trace = ''.join(traceback.format_tb(error.__traceback__))
     
     # Prepare error message
@@ -29,8 +33,9 @@ async def error_handler(update: Optional[Update], context: ContextTypes.DEFAULT_
             error_msg += f"Chat ID: {update.effective_chat.id}\n"
         if update.effective_user:
             error_msg += f"User: {update.effective_user.first_name} (ID: {update.effective_user.id})\n"
-        if update.effective_message:
-            error_msg += f"Message: {update.effective_message.text[:100]}...\n" if len(update.effective_message.text) > 100 else f"Message: {update.effective_message.text}\n"
+        if update.effective_message and update.effective_message.text:
+            msg_text = update.effective_message.text
+            error_msg += f"Message: {msg_text[:100]}...\n" if len(msg_text) > 100 else f"Message: {msg_text}\n"
     
     # Log different types of errors appropriately
     if isinstance(error, Forbidden):
@@ -70,25 +75,16 @@ async def error_handler(update: Optional[Update], context: ContextTypes.DEFAULT_
         except TelegramError:
             logger.error("Could not send error message to user", exc_info=True)
 
-async def notify_admin_of_error(error_msg: str, error: Exception, update: Optional[Update] = None) -> None:
+async def notify_admin_of_error(error_msg: str, error: Optional[Exception], update: Optional[Update] = None) -> None:
     """Notify admin of errors with detailed information"""
-    try:
-        # Add debug information
-        debug_info = "\n\nDebug Information:"
-        if update:
-            debug_info += f"\nUpdate Type: {update.update_id}"
-            if update.effective_message:
-                debug_info += f"\nMessage Type: {update.effective_message.type}"
+    if error is None:
+        await notify_admin(error_msg)
+        return
         
-        # Add error details
-        debug_info += f"\nError Type: {type(error).__name__}"
-        if hasattr(error, 'message'):
-            debug_info += f"\nError Message: {error.message}"
+    # Add error details
+    error_details = f"{error_msg}\n\nError details:\n{str(error)}"
+    if hasattr(error, '__traceback__'):
+        trace = ''.join(traceback.format_tb(error.__traceback__))
+        error_details += f"\n\nTraceback:\n{trace}"
         
-        # Add traceback
-        debug_info += f"\n\nTraceback:\n{traceback.format_exc()}"
-        
-        # Send notification
-        await notify_admin(error_msg + debug_info)
-    except Exception as e:
-        logger.error(f"Failed to notify admin of error: {str(e)}", exc_info=True)
+    await notify_admin(error_details)
