@@ -1,5 +1,7 @@
 """Test fixtures."""
 
+from typing import Any, Dict
+
 import pytest
 
 from swarmer.agent import Agent
@@ -18,19 +20,29 @@ class MockContext(Context):
         """Process a message."""
         return f"Processed: {message}"
 
-    def get_context(self, agent: AgentIdentity) -> str:
-        """Get context."""
-        return "Mock context state"
+    def get_context(self, agent: AgentIdentity) -> Dict[str, Any]:
+        """Get test context.
+
+        Args:
+            agent: The agent requesting context.
+
+        Returns:
+            Test context state.
+        """
+        return {
+            "message": "Test context",
+            "tools": [tool.__name__ for tool in self.tools],
+        }
 
     def get_context_instructions(self, agent: AgentIdentity) -> str:
         """Get context instructions."""
         return "Mock context instructions"
 
-    def serialize(self) -> dict:
+    def serialize(self) -> Dict[str, Any]:
         """Serialize context."""
         return {"id": self.id}
 
-    def deserialize(self, state: dict, agent_identity: AgentIdentity) -> None:
+    def deserialize(self, state: Dict[str, Any], agent_identity: AgentIdentity) -> None:
         """Deserialize context."""
         self.id = state["id"]
 

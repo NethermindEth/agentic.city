@@ -1,9 +1,13 @@
-from typing import Dict, Optional
-from flask import Flask, render_template_string, abort
+"""Server component for the debug UI."""
+
 import threading
+from typing import Dict, Optional, cast
+
+from flask import Flask, abort, render_template_string
+
+from swarmer.agent import Agent
 from swarmer.debug_ui.context_ui import ContextDebugUI
-from swarmer.swarmer_types import AgentBase
-from litellm import Message
+from swarmer.swarmer_types import Context
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -11,18 +15,18 @@ HTML_TEMPLATE = """
 <head>
     <title>Agent Debug UI - {{ agent.identity.name }}</title>
     <style>
-        body { 
-            font-family: Arial, sans-serif; 
+        body {
+            font-family: Arial, sans-serif;
             margin: 0;
             padding: 20px;
             background: #f5f5f5;
         }
-        
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
         }
-        
+
         .header {
             display: flex;
             justify-content: space-between;
@@ -33,25 +37,25 @@ HTML_TEMPLATE = """
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        
+
         .token-usage {
             text-align: right;
             padding: 10px;
             background: #f8f9fa;
             border-radius: 5px;
         }
-        
+
         .token-usage h3 {
             margin-top: 0;
         }
-        
+
         .tabs {
             background: white;
             padding: 10px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        
+
         .tab-buttons {
             display: flex;
             gap: 10px;
@@ -59,7 +63,7 @@ HTML_TEMPLATE = """
             border-bottom: 1px solid #dee2e6;
             padding-bottom: 10px;
         }
-        
+
         .tab-button {
             padding: 10px 20px;
             border: none;
@@ -69,27 +73,27 @@ HTML_TEMPLATE = """
             border-radius: 5px;
             transition: all 0.2s;
         }
-        
+
         .tab-button:hover {
             background: #f8f9fa;
         }
-        
+
         .tab-button.active {
             background: #007bff;
             color: white;
         }
-        
+
         .tab-content {
             display: none;
             padding: 20px;
             background: white;
             border-radius: 5px;
         }
-        
+
         .tab-content.active {
             display: block;
         }
-        
+
         /* Message styles */
         .message {
             padding: 15px;
@@ -97,12 +101,12 @@ HTML_TEMPLATE = """
             border-radius: 8px;
             border: 1px solid #dee2e6;
         }
-        
+
         .user { background-color: #e3f2fd; }
         .assistant { background-color: #f8f9fa; }
         .system { background-color: #fff3e0; }
         .tool { background-color: #e8f5e9; }
-        
+
         /* Tools section */
         .tool-entry {
             margin: 15px 0;
@@ -111,7 +115,7 @@ HTML_TEMPLATE = """
             border-radius: 8px;
             border-left: 4px solid #007bff;
         }
-        
+
         /* Context sections */
         .context-section {
             margin: 15px 0;
@@ -120,14 +124,14 @@ HTML_TEMPLATE = """
             border-radius: 8px;
             border: 1px solid #dee2e6;
         }
-        
+
         /* Utility classes */
         .metadata { font-size: 0.9em; color: #666; }
         .content { white-space: pre-wrap; }
-        code { 
-            background: #e9ecef; 
-            padding: 2px 4px; 
-            border-radius: 3px; 
+        code {
+            background: #e9ecef;
+            padding: 2px 4px;
+            border-radius: 3px;
             font-family: monospace;
         }
     </style>
@@ -135,29 +139,29 @@ HTML_TEMPLATE = """
         function showTab(tabId) {
             // Save active tab to localStorage
             localStorage.setItem('activeTab', tabId);
-            
+
             // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
             });
-            
+
             // Remove active class from all buttons
             document.querySelectorAll('.tab-button').forEach(button => {
                 button.classList.remove('active');
             });
-            
+
             // Show selected tab
             document.getElementById(tabId).classList.add('active');
             document.querySelector(`[onclick="showTab('${tabId}')"]`).classList.add('active');
         }
-        
+
         // Handle message view toggle
         document.addEventListener('DOMContentLoaded', function() {
             const checkbox = document.getElementById('showFullSequence');
             const savedState = localStorage.getItem('showFullSequence');
             checkbox.checked = savedState === 'true';
             toggleMessageView();
-            
+
             // Restore active tab
             const activeTab = localStorage.getItem('activeTab') || 'messages-tab';
             showTab(activeTab);
@@ -168,7 +172,7 @@ HTML_TEMPLATE = """
             const standardView = document.getElementById('standardMessages');
             const fullView = document.getElementById('fullSequence');
             localStorage.setItem('showFullSequence', checkbox.checked);
-            
+
             if (checkbox.checked) {
                 standardView.style.display = 'none';
                 fullView.style.display = 'block';
@@ -296,20 +300,32 @@ HTML_TEMPLATE = """
 </html>
 """
 
+
 class DebugUIServer:
+    """Debug server for monitoring and interacting with Swarmer agents.
+
+    This class provides a web interface for real-time monitoring of agent states,
+    contexts, and interactions. It uses Flask to serve the debug UI and handle
+    HTTP requests.
+    """
+
     def __init__(self, port: int = 5000) -> None:
+        """Initialize the debug server.
+
+        Args:
+            port: The port number to listen on.
+        """
         self.port = port
-        self.agents: Dict[int, AgentBase] = {}
+        self.agents: Dict[int, Agent] = {}
         self.app = Flask(__name__)
         self.server_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
-        
-        @self.app.route('/')
+
+        @self.app.route("/")
         def home() -> str:
-            """Display list of all agents"""
+            """Display list of all agents."""
             agent_list = {
-                user_id: agent.identity.name 
-                for user_id, agent in self.agents.items()
+                user_id: agent.identity.name for user_id, agent in self.agents.items()
             }
             return render_template_string(
                 """
@@ -317,8 +333,8 @@ class DebugUIServer:
                 <head>
                     <title>Agent Debug UI</title>
                     <style>
-                        body { 
-                            font-family: Arial, sans-serif; 
+                        body {
+                            font-family: Arial, sans-serif;
                             margin: 0;
                             padding: 20px;
                             background: #f5f5f5;
@@ -359,61 +375,77 @@ class DebugUIServer:
                 </body>
                 </html>
                 """,
-                agents=agent_list
+                agents=agent_list,
             )
 
-        @self.app.route('/agent/<int:user_id>')
+        @self.app.route("/agent/<int:user_id>")
         def agent_details(user_id: int) -> str:
-            """Display details for a specific agent"""
+            """Display details for a specific agent."""
             agent = self.agents.get(user_id)
             if not agent:
                 abort(404)
 
             # Create context UIs
             context_uis = {}
-            for context in agent.contexts.values():
-                ui = ContextDebugUI.get_ui_for_context(context)
-                if ui:
-                    context_uis[context.id] = ui.render()
-            
+            if agent and agent.contexts:
+                for context in agent.contexts.values():
+                    # Cast AgentContext to Context for type compatibility
+                    context_ui = ContextDebugUI.get_ui_for_context(
+                        cast(Context, context)
+                    )
+                    if context_ui and hasattr(context, "id"):
+                        context_uis[context.id] = context_ui.render()
+
             # Get constitution text
             from swarmer.globals.consitution import constitution
+
             constitution_text = constitution.instruction
-            
+
             # Get context instructions and current context
-            context_instructions = agent.get_context_instructions()
-            current_context = agent.get_context()
-                    
+            context_instructions = agent.get_context_instructions() if agent else []
+            current_context = agent.get_context() if agent else []
+
             return render_template_string(
-                HTML_TEMPLATE, 
+                HTML_TEMPLATE,
                 agent=agent,
                 context_uis=context_uis,
                 constitution_text=constitution_text,
                 context_instructions=context_instructions,
-                current_context=current_context
+                current_context=current_context,
             )
-    
-    def register_agent(self, user_id: int, agent: AgentBase) -> None:
-        """Register an agent with the debug UI"""
-        self.agents[user_id] = agent
 
-    def unregister_agent(self, user_id: int) -> None:
-        """Unregister an agent from the debug UI"""
-        self.agents.pop(user_id, None)
+    def register_agent(self, agent: Agent) -> None:
+        """Register an agent with the debug UI server.
+
+        Args:
+            agent: The agent to register for monitoring.
+        """
+        if hasattr(agent.identity, "user_id"):
+            self.agents[int(agent.identity.user_id)] = agent
+
+    def unregister_agent(self, agent: Agent) -> None:
+        """Remove an agent from the debug UI server.
+
+        Args:
+            agent: The agent to unregister.
+        """
+        if hasattr(agent.identity, "user_id"):
+            self.agents.pop(int(agent.identity.user_id), None)
 
     def start(self) -> None:
-        """Start the debug UI server in a separate thread"""
-        def run_server() -> None:
-            from werkzeug.serving import make_server
-            self.server = make_server('127.0.0.1', self.port, self.app)
-            self.server.serve_forever()
-            
-        self.server_thread = threading.Thread(target=run_server, daemon=True)
+        """Start the debug UI server in a separate thread."""
+
+    def stop(self) -> None:
+        """Stop the debug UI server and clean up resources."""
+
+    def _run(self) -> None:
+        """Run the Flask server in the background thread."""
+        from werkzeug.serving import make_server
+
+        self.server = make_server("127.0.0.1", self.port, self.app)
+        self.server.serve_forever()
+
+    def run(self) -> None:
+        """Start the debug UI server in a separate thread."""
+        self.server_thread = threading.Thread(target=self._run, daemon=True)
         self.server_thread.start()
-    
-    def shutdown(self) -> None:
-        """Shutdown the debug UI server"""
-        if hasattr(self, 'server'):
-            self.server.shutdown()
-        if self.server_thread is not None and self.server_thread.is_alive():
-            self.server_thread.join(timeout=5.0)

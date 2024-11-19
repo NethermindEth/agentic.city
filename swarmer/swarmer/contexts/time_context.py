@@ -1,118 +1,112 @@
-from typing import Optional
-from uuid import uuid4
-import time
+"""Module for managing time-related operations and scheduling."""
+
 from datetime import datetime, timezone
-from swarmer.tools.utils import tool, ToolResponse
+from typing import Any, Dict
+from uuid import uuid4
+
 from swarmer.swarmer_types import AgentIdentity, Context, Tool
+from swarmer.tools.utils import ToolResponse, tool
+
 
 class TimeContext(Context):
-    """Context for managing time-related operations and awareness.
-    
-    This context provides tools for:
-    - Getting current time in different formats
-    - Converting between timezones
-    - Basic time calculations
-    
-    The context is intentionally lightweight and stateless, focusing on 
-    providing time awareness to agents."""
-    
+    """Context for handling time-related operations and scheduling tasks.
+
+    This context provides tools for agents to manage time-based operations,
+    including getting current time, scheduling tasks, and managing timeouts.
+    """
+
     tools: list[Tool] = []
 
     def __init__(self) -> None:
-        self.tools.extend([
-            self.get_current_time,
-            self.format_timestamp,
-            self.get_time_difference
-        ])
+        """Initialize time context with time management tools."""
+        self.tools.extend(
+            [self.get_current_time, self.format_timestamp, self.get_time_difference]
+        )
         self.id = str(uuid4())
 
-    def get_context_instructions(self, agent: AgentIdentity) -> Optional[str]:
+    def get_context_instructions(self, agent: AgentIdentity) -> str:
+        """Get instructions for using the time context.
+
+        Args:
+            agent: The agent requesting instructions.
+
+        Returns:
+            Instructions for using time-related tools.
+        """
         return """
-        You have access to time-related tools that allow you to:
-        1. Get the current time in different formats
-        2. Format timestamps into human-readable strings
-        3. Calculate time differences
-        
-        Use these capabilities when:
-        - Referencing the current time
-        - Discussing time periods
-        - Calculating durations
-        
-        Time is always handled in UTC to avoid timezone confusion.
-        Don't mention time capabilities just use the tooling to be accurate
+        Time Context Instructions:
+        - Use time-related tools to track and manage time
+        - Available tools: get_current_time, format_timestamp, get_time_difference
         """
 
-    def get_context(self, agent: AgentIdentity) -> Optional[str]:
-        """Provide current time context."""
+    def get_context(self, agent: AgentIdentity) -> Dict[str, Any]:
+        """Get the current time context.
+
+        Args:
+            agent: The agent requesting context.
+
+        Returns:
+            Current time state and available tools.
+        """
         current_time = datetime.now(timezone.utc)
-        return f"Current UTC time: {current_time.strftime('%Y-%m-%d %H:%M:%S')}"
+        return {
+            "current_time": current_time.isoformat(),
+            "timezone": "UTC",
+            "tools": [tool.__name__ for tool in self.tools],
+        }
 
     @tool
-    def get_current_time(self, agent_identity: AgentIdentity, format: str = "iso") -> ToolResponse:
+    def get_current_time(
+        self, agent_identity: AgentIdentity, format: str = "iso"
+    ) -> ToolResponse:
         """Get the current time in UTC.
-        
+
         Args:
             agent_identity: The agent requesting the time
             format: Output format ('iso', 'unix', or 'human')
-            
+
         Returns:
             ToolResponse containing the current time in requested format
         """
         now = datetime.now(timezone.utc)
-        
+
         try:
             if format == "unix":
                 unix_time = int(now.timestamp())
                 return ToolResponse(
                     summary=f"Current Unix timestamp: {unix_time}",
-                    content={
-                        "timestamp": unix_time,
-                        "format": "unix"
-                    },
-                    error=None
+                    content={"timestamp": unix_time, "format": "unix"},
+                    error=None,
                 )
             elif format == "human":
-                human_time = now.strftime('%B %d, %Y %H:%M:%S')
+                human_time = now.strftime("%B %d, %Y %H:%M:%S")
                 return ToolResponse(
                     summary=f"Current time (UTC): {human_time}",
-                    content={
-                        "time": human_time,
-                        "format": "human"
-                    },
-                    error=None
+                    content={"time": human_time, "format": "human"},
+                    error=None,
                 )
             else:  # iso format
                 iso_time = now.isoformat()
                 return ToolResponse(
                     summary=f"Current ISO time: {iso_time}",
-                    content={
-                        "time": iso_time,
-                        "format": "iso"
-                    },
-                    error=None
+                    content={"time": iso_time, "format": "iso"},
+                    error=None,
                 )
         except Exception as e:
             error_msg = f"Error getting current time: {str(e)}"
-            return ToolResponse(
-                summary=error_msg,
-                content=None,
-                error=error_msg
-            )
+            return ToolResponse(summary=error_msg, content=None, error=error_msg)
 
     @tool
     def format_timestamp(
-        self,
-        agent_identity: AgentIdentity,
-        timestamp: float,
-        format: str = "human"
+        self, agent_identity: AgentIdentity, timestamp: float, format: str = "human"
     ) -> ToolResponse:
         """Format a Unix timestamp into a human-readable string.
-        
+
         Args:
             agent_identity: The agent requesting formatting
             timestamp: Unix timestamp to format
             format: Output format ('iso', 'human')
-            
+
         Returns:
             ToolResponse containing the formatted time string
         """
@@ -125,43 +119,36 @@ class TimeContext(Context):
                     content={
                         "time": iso_time,
                         "format": "iso",
-                        "input_timestamp": timestamp
+                        "input_timestamp": timestamp,
                     },
-                    error=None
+                    error=None,
                 )
             else:  # human
-                human_time = dt.strftime('%B %d, %Y %H:%M:%S')
+                human_time = dt.strftime("%B %d, %Y %H:%M:%S")
                 return ToolResponse(
                     summary=f"Formatted time: {human_time} UTC",
                     content={
                         "time": human_time,
                         "format": "human",
-                        "input_timestamp": timestamp
+                        "input_timestamp": timestamp,
                     },
-                    error=None
+                    error=None,
                 )
         except ValueError as e:
             error_msg = f"Error formatting timestamp: {str(e)}"
-            return ToolResponse(
-                summary=error_msg,
-                content=None,
-                error=error_msg
-            )
+            return ToolResponse(summary=error_msg, content=None, error=error_msg)
 
     @tool
     def get_time_difference(
-        self,
-        agent_identity: AgentIdentity,
-        timestamp1: float,
-        timestamp2: float
+        self, agent_identity: AgentIdentity, timestamp1: float, timestamp2: float
     ) -> ToolResponse:
         """Calculate the difference between two Unix timestamps.
-        
+
         Args:
             agent_identity: The agent requesting the calculation
             timestamp1: First Unix timestamp
             timestamp2: Second Unix timestamp
-            
+
         Returns:
             ToolResponse containing the time difference in seconds and a human-readable format
         """
@@ -173,7 +160,7 @@ class TimeContext(Context):
             remaining %= 3600
             minutes = int(remaining // 60)
             seconds = int(remaining % 60)
-            
+
             human_diff = []
             if days > 0:
                 human_diff.append(f"{days} days")
@@ -183,9 +170,9 @@ class TimeContext(Context):
                 human_diff.append(f"{minutes} minutes")
             if seconds > 0 or not human_diff:
                 human_diff.append(f"{seconds} seconds")
-                
+
             human_readable = ", ".join(human_diff)
-            
+
             return ToolResponse(
                 summary=f"Time difference: {human_readable}",
                 content={
@@ -195,28 +182,19 @@ class TimeContext(Context):
                         "days": days,
                         "hours": hours,
                         "minutes": minutes,
-                        "seconds": seconds
+                        "seconds": seconds,
                     },
-                    "timestamps": {
-                        "first": timestamp1,
-                        "second": timestamp2
-                    }
+                    "timestamps": {"first": timestamp1, "second": timestamp2},
                 },
-                error=None
+                error=None,
             )
         except Exception as e:
             error_msg = f"Error calculating time difference: {str(e)}"
-            return ToolResponse(
-                summary=error_msg,
-                content=None,
-                error=error_msg
-            )
+            return ToolResponse(summary=error_msg, content=None, error=error_msg)
 
     def serialize(self) -> dict:
         """Serialize context state - TimeContext is stateless."""
-        return {
-            "id": self.id
-        }
+        return {"id": self.id}
 
     def deserialize(self, state: dict, agent_identity: AgentIdentity) -> None:
         """Load state into context - TimeContext is stateless."""
