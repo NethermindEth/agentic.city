@@ -1,3 +1,3 @@
 from .agent import *
-from .types import *
+from .swarmer_types import *
 from .utils import *

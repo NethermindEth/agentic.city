@@ -17,7 +17,7 @@ Usage:
    agent = agent_registry.get_agent(agent_identity)
 """
 
-from swarmer.types import AgentBase, AgentIdentity, AgentRegistry
+from swarmer.swarmer_types import AgentBase, AgentIdentity, AgentRegistry
 
 class AgentRegistry_(AgentRegistry):
    def __init__(self) -> None:

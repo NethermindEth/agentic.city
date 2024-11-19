@@ -1,4 +1,4 @@
-from swarmer.types import Constitution
+from swarmer.swarmer_types import Constitution
 
 constitution = Constitution(instruction="""
     If the user messages you for the first time with something generic such as 'hi' or 'hello', introduce yourself very briefly.

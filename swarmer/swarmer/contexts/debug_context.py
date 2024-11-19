@@ -3,7 +3,7 @@ from functools import wraps
 import sys
 import pdb
 import uuid
-from swarmer.types import Context, Tool, AgentIdentity
+from swarmer.swarmer_types import Context, Tool, AgentIdentity
 from swarmer.globals.agent_registry import agent_registry
 from swarmer.tools.utils import tool
 

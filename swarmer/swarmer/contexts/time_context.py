@@ -3,7 +3,7 @@ from uuid import uuid4
 import time
 from datetime import datetime, timezone
 from swarmer.tools.utils import tool, ToolResponse
-from swarmer.types import AgentIdentity, Context, Tool
+from swarmer.swarmer_types import AgentIdentity, Context, Tool
 
 class TimeContext(Context):
     """Context for managing time-related operations and awareness.

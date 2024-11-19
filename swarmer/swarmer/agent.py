@@ -1,5 +1,5 @@
 import json
-from swarmer.types import AgentBase, AgentIdentity, Context, Tool, Message
+from swarmer.swarmer_types import AgentBase, AgentIdentity, Context, Tool, Message
 from typing import Any, Optional, List, Dict, Union, Protocol, TypeVar, runtime_checkable, cast
 from swarmer.globals.consitution import constitution
 from litellm import completion

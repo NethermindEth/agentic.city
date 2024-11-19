@@ -2704,6 +2704,16 @@ python-versions = "^3.9"
 files = []
 develop = false
 
+[package.dependencies]
+beautifulsoup4 = "^4.12.3"
+eth-account = "^0.13.4"
+eth-typing = "^5.0.1"
+flask = "^3.0.3"
+litellm = "^1.52.3"
+requests = "^2.31.0"
+web3 = "^7.5.0"
+werkzeug = "^3.0.1"
+
 [package.source]
 type = "directory"
 url = "../swarmer"

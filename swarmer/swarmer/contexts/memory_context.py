@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 import time
 from dataclasses import dataclass
 from swarmer.tools.utils import tool, ToolResponse
-from swarmer.types import AgentIdentity, Context, Tool
+from swarmer.swarmer_types import AgentIdentity, Context, Tool
 
 @dataclass
 class MemoryEntry:

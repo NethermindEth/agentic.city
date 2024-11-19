@@ -1,5 +1,5 @@
 from swarmer.tools.utils import tool, ToolResponse
-from swarmer.types import AgentIdentity
+from swarmer.swarmer_types import AgentIdentity
 from swarmer.agent import Agent
 from swarmer.globals.agent_registry import agent_registry
 

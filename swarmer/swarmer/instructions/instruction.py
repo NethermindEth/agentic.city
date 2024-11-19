@@ -1,4 +1,4 @@
-from swarmer.types import InstructionBase
+from swarmer.swarmer_types import InstructionBase
 import hashlib
 
 class Instruction(InstructionBase):

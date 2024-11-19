@@ -8,7 +8,7 @@ from eth_account import Account
 from eth_typing import Address
 from web3 import Web3
 from swarmer.tools.utils import tool
-from swarmer.types import AgentIdentity, Context, Tool
+from swarmer.swarmer_types import AgentIdentity, Context, Tool
 
 # Token address mapping
 TOKEN_ADDRESSES = {

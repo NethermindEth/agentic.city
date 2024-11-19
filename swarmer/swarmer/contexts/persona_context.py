@@ -3,7 +3,7 @@ import uuid
 import hashlib
 from swarmer.instructions.instruction import Persona
 from swarmer.tools.utils import function_to_schema, tool, ToolResponse
-from swarmer.types import AgentIdentity, Context, Tool
+from swarmer.swarmer_types import AgentIdentity, Context, Tool
 from swarmer.globals.agent_registry import agent_registry
 
 class PersonaContext(Context):

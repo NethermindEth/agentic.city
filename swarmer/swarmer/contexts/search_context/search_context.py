@@ -1,6 +1,6 @@
 from typing import Optional, cast, List
 from uuid import uuid4
-from swarmer.types import AgentIdentity, Context, Tool
+from swarmer.swarmer_types import AgentIdentity, Context, Tool
 from swarmer.tools.google_search import search_google
 from swarmer.tools.web_reader import read_webpage
 

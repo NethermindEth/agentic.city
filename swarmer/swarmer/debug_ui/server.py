@@ -2,7 +2,7 @@ from typing import Dict, Optional
 from flask import Flask, render_template_string, abort
 import threading
 from swarmer.debug_ui.context_ui import ContextDebugUI
-from swarmer.types import AgentBase
+from swarmer.swarmer_types import AgentBase
 from litellm import Message
 
 HTML_TEMPLATE = """

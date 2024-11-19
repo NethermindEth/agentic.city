@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Optional
 import json
 
 if TYPE_CHECKING:
-    from swarmer.types import Context, Message
+    from swarmer.swarmer_types import Context, Message
 
 class ContextDebugUI(ABC):
     """Base class for context-specific debug UI components"""

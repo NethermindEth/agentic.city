@@ -1,7 +1,7 @@
 from typing import Dict
 from swarmer.tools.utils import tool, ToolResponse
 from swarmer.tools.dependencies import requires
-from swarmer.types import AgentIdentity
+from swarmer.swarmer_types import AgentIdentity
 
 @requires('requests', 'beautifulsoup4')
 @tool

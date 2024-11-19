@@ -8,7 +8,7 @@ from pathlib import Path
 import logging
 
 from swarmer.tools.utils import tool, ToolResponse
-from swarmer.types import AgentIdentity, Context, Tool
+from swarmer.swarmer_types import AgentIdentity, Context, Tool
 from swarmer.globals.agent_registry import agent_registry
 
 class ToolCreationContext(Context):
@@ -59,7 +59,7 @@ class ToolCreationContext(Context):
         ```python
         from swarmer.tools.utils import tool, ToolResponse
         from swarmer.tools.dependencies import requires
-        from swarmer.types import AgentIdentity
+        from swarmer.swarmer_types import AgentIdentity
         
         @requires('requests')
         @tool
@@ -178,7 +178,7 @@ class ToolCreationContext(Context):
         final_code = (
             "from swarmer.tools.utils import tool, ToolResponse\n"
             "from swarmer.tools.dependencies import requires\n"
-            "from swarmer.types import AgentIdentity\n\n"
+            "from swarmer.swarmer_types import AgentIdentity\n\n"
         ) + code
         
         try:
@@ -360,7 +360,7 @@ class ToolCreationContext(Context):
         final_code = (
             "from swarmer.tools.utils import tool, ToolResponse\n"
             "from swarmer.tools.dependencies import requires\n"
-            "from swarmer.types import AgentIdentity\n\n"
+            "from swarmer.swarmer_types import AgentIdentity\n\n"
         ) + code
         
         try:
