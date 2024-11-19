@@ -1,18 +1,30 @@
-from telegram import Update
-from telegram.ext import ContextTypes
+"""Module for dumping agent state and data in a serializable format."""
+
 import json
 from typing import Any
 from uuid import UUID
+
+from telegram import Update
+from telegram.ext import ContextTypes
+
 from telegram_bot.agents.agent_manager import agent_manager
 
+
 def serialize_object(obj: Any) -> Any:
-    """Helper function to serialize objects"""
+    """Serialize complex objects into JSON-compatible format.
+
+    Args:
+        obj: Any Python object to serialize
+
+    Returns:
+        JSON-serializable representation of the object
+    """
     if isinstance(obj, UUID):
         return str(obj)
-    if hasattr(obj, '__dict__'):
+    if hasattr(obj, "__dict__"):
         return {
-            'type': obj.__class__.__name__,
-            **{k: serialize_object(v) for k, v in obj.__dict__.items()}
+            "type": obj.__class__.__name__,
+            **{k: serialize_object(v) for k, v in obj.__dict__.items()},
         }
     elif isinstance(obj, dict):
         return {k: serialize_object(v) for k, v in obj.items()}
@@ -23,8 +35,14 @@ def serialize_object(obj: Any) -> Any:
     else:
         return str(obj)
 
+
 async def dump_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handler for /dump command"""
+    """Handle the /dump command to export agent state.
+
+    Args:
+        update: The update containing the command
+        context: The context for this handler
+    """
     if not update.message or not update.effective_user:
         return
 
@@ -42,27 +60,27 @@ async def dump_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             name: {
                 "name": tool.__name__,
                 "doc": tool.__doc__,
-                "schema": tool.schema if hasattr(tool, 'schema') else None
+                "schema": tool.schema if hasattr(tool, "schema") else None,
             }
             for name, tool in agent.tools.items()
         },
     }
-    
+
     # Format as pretty JSON
     dump_text = json.dumps(state, indent=2)
-    
+
     # Split message if too long
     MAX_LENGTH = 2000  # Telegram message length limit
     if len(dump_text) > MAX_LENGTH:
-        chunks = [dump_text[i:i + MAX_LENGTH] for i in range(0, len(dump_text), MAX_LENGTH)]
+        chunks = [
+            dump_text[i : i + MAX_LENGTH] for i in range(0, len(dump_text), MAX_LENGTH)
+        ]
         for i, chunk in enumerate(chunks):
             prefix = "🤖 Agent State Dump (Part {}/{}):\n".format(i + 1, len(chunks))
             await update.message.reply_text(
-                f"{prefix}```json\n{chunk}\n```",
-                parse_mode='Markdown'
+                f"{prefix}```json\n{chunk}\n```", parse_mode="Markdown"
             )
     else:
         await update.message.reply_text(
-            f"🤖 Agent State Dump:\n```json\n{dump_text}\n```",
-            parse_mode='Markdown'
-        ) 
+            f"🤖 Agent State Dump:\n```json\n{dump_text}\n```", parse_mode="Markdown"
+        )

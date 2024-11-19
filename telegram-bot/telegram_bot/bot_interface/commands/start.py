@@ -1,18 +1,27 @@
+"""Module for handling the start command that initializes bot interaction."""
+
 from telegram import Update
 from telegram.ext import ContextTypes
+
 from telegram_bot.agents.agent_manager import agent_manager
 
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handler for /start command"""
+    """Initialize bot interaction and create a new agent.
+
+    Args:
+        update: The update containing the command
+        context: The context for this handler
+    """
     if update.message is None or update.effective_user is None:
         return
-        
+
     user = update.effective_user
-    
+
     # Clear agent message history if it exists
     agent = agent_manager.get_or_create_agent(user.id)
     agent.clear_message_log()
-    
+
     welcome_message = (
         f"Welcome {user.first_name}!\n\n"
         "I am an autonomous agent capable of extending my own capabilities through code. "
@@ -37,5 +46,5 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "DISCLAIMER: we will regularly reset the state of your agent\n"
         "----------------------------------------\n"
     )
-    
+
     await update.message.reply_text(welcome_message)
