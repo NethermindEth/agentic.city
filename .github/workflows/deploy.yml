@@ -61,15 +61,21 @@ jobs:
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
           
-      - name: Install dependencies
+      - name: Install dependencies (swarmer)
+        working-directory: ./swarmer
+        run: poetry install
+
+      - name: Test swarmer
+        working-directory: ./swarmer
+        run: poetry run mypy --no-incremental swarmer/
+
+      - name: Install dependencies (telegram-bot)
         working-directory: ./telegram-bot
         run: poetry install
         
-      - name: Run tests
+      - name: Test telegram-bot
         working-directory: ./telegram-bot
-        run: |
-          poetry run mypy --no-incremental telegram_bot/
-          poetry run mypy --no-incremental swarmer/
+        run: poetry run mypy --no-incremental telegram_bot/
         
       - name: Build deployment package
         working-directory: ./telegram-bot
