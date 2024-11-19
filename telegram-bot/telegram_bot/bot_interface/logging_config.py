@@ -3,7 +3,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-def setup_logging():
+def setup_logging() -> None:
     """Configure logging with both file and console handlers"""
     # Create logs directory if it doesn't exist
     log_dir = Path("logs")
@@ -45,5 +45,3 @@ def setup_logging():
     # Set third-party loggers to WARNING to reduce noise
     logging.getLogger('telegram').setLevel(logging.WARNING)
     logging.getLogger('httpx').setLevel(logging.WARNING)
-
-    return root_logger

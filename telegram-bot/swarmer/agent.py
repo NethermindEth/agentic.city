@@ -1,15 +1,28 @@
 import json
 from swarmer.types import AgentBase, AgentIdentity, Context, Tool, Message
-from typing import Any, Optional, List, Dict
+from typing import Any, Optional, List, Dict, Union, Protocol, TypeVar, runtime_checkable, cast
 from swarmer.globals.consitution import constitution
 from litellm import completion
 from swarmer.globals.agent_registry import agent_registry
+from swarmer.tools.utils import ToolResponse
+from swarmer.tools.types import Tool
 import uuid
 import logging
 from pathlib import Path
 import os
 import importlib.util
 import sys
+
+T = TypeVar('T')
+
+@runtime_checkable
+class ToolCall(Protocol):
+    id: str
+    
+    @property
+    def function(self) -> Any:
+        """The function object containing name and arguments."""
+        ...
 
 class Agent(AgentBase):
     @staticmethod
@@ -101,14 +114,17 @@ class Agent(AgentBase):
             "completion_tokens": 0,
             "total_tokens": 0
         }
-        self.load_user_tools()
+        self.load_agent_tools()
 
     # -----
     # Tools
     # -----
     def register_tool(self, tool: Tool) -> None:
         """Register a tool with the agent."""
+        logger = logging.getLogger(__name__)
+        logger.info(f"Registering tool '{tool.__name__}' for agent {self.identity.id}")
         self.tools[tool.__name__] = tool
+        logger.info(f"Successfully registered tool '{tool.__name__}'")
 
     def unregister_tool(self, tool_name: str) -> None:
         """Unregister a tool from the agent."""
@@ -173,14 +189,20 @@ class Agent(AgentBase):
                 for tool_call in message.tool_calls:
                     try:
                         tool_result = self.execute_tool_call(tool_call)
-                        tool_result_message = Message(role="tool", content=tool_result, tool_call_id=tool_call.id)
+                        tool_result_message = Message(
+                            role="tool", 
+                            content=tool_result, 
+                            tool_call_id=tool_call.id,
+                            name=tool_call.function.name
+                        )
                         response_history.append(tool_result_message)
                     except Exception as e:
                         logger.error(f"Error executing tool call: {e}", exc_info=True)
                         tool_result_message = Message(
                             role="tool", 
                             content=f"Error executing tool: {str(e)}", 
-                            tool_call_id=tool_call.id
+                            tool_call_id=tool_call.id,
+                            name=tool_call.function.name
                         )
                         response_history.append(tool_result_message)
 
@@ -210,14 +232,56 @@ class Agent(AgentBase):
             )
             return [error_message]
 
-    # TODO fix the tool_call type
-    def execute_tool_call(self, tool_call: Any) -> str:
-        """Execute a tool call and return a formatted result string"""
-        name = tool_call.function.name
-        args = json.loads(tool_call.function.arguments)
+    def execute_tool(self, tool_name: str, **kwargs: Any) -> ToolResponse:
+        """Execute a tool by name with given arguments.
         
-        result = self.tools[name](self.identity, **args)
-        return str(result)
+        Args:
+            tool_name: Name of the tool to execute
+            **kwargs: Arguments to pass to the tool
+            
+        Returns:
+            ToolResponse containing the result
+        """
+        if tool_name not in self.tools:
+            return ToolResponse(
+                summary=f"Tool {tool_name} not found",
+                content=None,
+                error=f"Tool {tool_name} not found"
+            )
+
+        tool = self.tools[tool_name]
+        kwargs['agent_identity'] = self.identity
+        
+        try:
+            response = tool(**kwargs)
+            return cast(ToolResponse, response)
+        except Exception as e:
+            return ToolResponse(
+                summary=f"Error executing tool: {str(e)}",
+                content=None,
+                error=str(e)
+            )
+
+    def execute_tool_call(self, tool_call: ToolCall) -> str:
+        """Execute a tool call from the LLM.
+        
+        Args:
+            tool_call: The tool call object from the LLM containing name and arguments
+            
+        Returns:
+            The result of the tool execution as a string
+        """
+        try:
+            args = json.loads(tool_call.function.arguments)
+            response = self.execute_tool(tool_call.function.name, **args)
+            
+            # Always return a string summary for LLM consumption
+            if response.error:
+                return f"Error executing tool: {response.error}"
+            return response.summary
+            
+        except Exception as e:
+            return f"Error executing tool: {str(e)}"
 
     def get_context_instructions(self) -> list[str]:
         """Get the context instructions for the agent."""
@@ -242,7 +306,7 @@ class Agent(AgentBase):
         """Clear the agent's message history"""
         self.message_log.clear()
 
-    def load_user_tools(self) -> None:
+    def load_agent_tools(self) -> None:
         """Load all tools from the agent's tools directory."""
         tools_dir = Path(os.getenv("AGENT_TOOLS_DIRECTORY", "agent_tools")) / self.identity.id
         if not tools_dir.exists():

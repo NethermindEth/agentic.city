@@ -1,6 +1,6 @@
 import logging
 import asyncio
-from typing import Optional, Any
+from typing import Optional, Any, List
 from datetime import datetime, timedelta
 from telegram.error import TelegramError, RetryAfter
 from telegram import Bot
@@ -12,7 +12,7 @@ class RateLimiter:
     def __init__(self, rate_limit: int = 1, per_seconds: int = 3):
         self.rate_limit = rate_limit
         self.per_seconds = per_seconds
-        self.calls = []
+        self.calls: List[datetime] = []
         self._lock = asyncio.Lock()
     
     async def acquire(self) -> None:

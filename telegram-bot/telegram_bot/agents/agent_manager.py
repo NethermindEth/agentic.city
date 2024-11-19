@@ -13,7 +13,10 @@ from swarmer.contexts.time_context import TimeContext
 from swarmer.contexts.crypto_context import CryptoContext
 from swarmer.contexts.debug_context import DebugContext
 from swarmer.contexts.tool_creation_context import ToolCreationContext
+from swarmer.contexts.search_context import SearchContext
 from swarmer.debug_ui.server import DebugUIServer
+from swarmer.tools.google_search import search_google
+from swarmer.tools.web_reader import read_webpage
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +86,7 @@ class AgentManager:
         crypto_context = CryptoContext()
         debug_context = DebugContext()
         tool_creation_context = ToolCreationContext()
+        search_context = SearchContext()
 
         agent.register_context(persona_context)
         agent.register_context(memory_context)
@@ -90,6 +94,7 @@ class AgentManager:
         agent.register_context(crypto_context)
         agent.register_context(debug_context)
         agent.register_context(tool_creation_context)
+        agent.register_context(search_context)
 
         # Create agent's tools directory
         tools_dir = Path(os.getenv("AGENT_TOOLS_DIRECTORY", "agent_tools")) / agent.identity.id

@@ -1,9 +1,18 @@
 import hashlib
 import inspect
 import json
-from typing import Any, cast
+from typing import Any, cast, List, Optional, Tuple, Protocol, TypeVar, runtime_checkable, Union, Dict, Callable
+from functools import wraps, update_wrapper
 
-from swarmer.types import Tool, ToolableType
+from swarmer.tools.types import Tool, ToolResponse, ToolableType
+from swarmer.tools.dependencies import ensure_dependencies, ToolFunction
+
+T_co = TypeVar('T_co', covariant=True)
+
+@runtime_checkable
+class WrappedTool(Tool, Protocol[T_co]):
+    __original_func__: ToolableType
+    __tool_dependencies__: List[tuple[str, Optional[str]]]
 
 def function_to_schema(func: ToolableType, name: str) -> dict:
     type_map = {
@@ -56,12 +65,12 @@ def function_to_schema(func: ToolableType, name: str) -> dict:
         },
     }
 
-def tool(
-    func: ToolableType
-) -> Tool:
+def tool(func: Callable[..., Union[str, ToolResponse]]) -> Tool:
     """Decorator that adds a schema property to a function based on its type hints.
     
     The schema property contains the OpenAI function calling schema for the decorated function.
+    The decorator also handles any dependencies specified by the @requires decorator and
+    wraps the response in a ToolResponse object if needed.
     
     Args:
         func: The function to decorate
@@ -69,15 +78,34 @@ def tool(
     Returns:
         The decorated function with an added schema property
     """
+    def wrapper(*args: Any, **kwargs: Any) -> ToolResponse:
+        # Ensure dependencies are installed
+        if hasattr(func, '__tool_dependencies__'):
+            ensure_dependencies(func.__tool_dependencies__)
+            
+        # Execute the tool function
+        result = func(*args, **kwargs)
+        
+        # Return if already a ToolResponse
+        if isinstance(result, ToolResponse):
+            return result
+        
+        # Convert to string and create summary
+        result_str = str(result)
+        summary = result_str[:100] + "..." if len(result_str) > 100 else result_str
+        
+        return ToolResponse(summary=summary, content=result)
 
-    def _wrapper(*args: Any, **kwargs: Any) -> str:
-        return func(*args, **kwargs)
-
-    wrapper = cast(Tool, _wrapper)
-    __tool_id__ = hashlib.sha256(inspect.getsource(func).encode()).hexdigest()
-    # Copy over function metadata
-    wrapper.__doc__ = func.__doc__
-    wrapper.__name__ = func.__name__ + __tool_id__[:16]
-    wrapper.__tool_schema__ = function_to_schema(func, wrapper.__name__)
-
-    return wrapper
+    # Generate the schema for the function
+    schema = function_to_schema(func, func.__name__)
+    
+    # Copy over function attributes
+    update_wrapper(wrapper, func)
+    
+    # Add tool-specific attributes
+    wrapper.__tool_doc__ = func.__doc__ or ""  # type: ignore
+    wrapper.__tool_schema__ = schema  # type: ignore
+    if hasattr(func, '__tool_dependencies__'):
+        wrapper.__tool_dependencies__ = func.__tool_dependencies__  # type: ignore
+    
+    return cast(Tool, wrapper)
