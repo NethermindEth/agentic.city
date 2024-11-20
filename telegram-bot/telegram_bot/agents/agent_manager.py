@@ -85,7 +85,9 @@ class AgentManager:
 
         # Shutdown debug UI
         if self.debug_ui:
-            self.debug_ui.shutdown()
+            if hasattr(self.debug_ui, "server"):
+                self.debug_ui.server.shutdown()
+            self._stop_event.set()
 
         logger.info("AgentManager shutdown complete")
 
@@ -218,8 +220,10 @@ class AgentManager:
                 logger.error(f"Failed to delete agent file for user {user_id}: {e}")
 
         # Remove from debug UI
-        if self.debug_ui:
-            self.debug_ui.unregister_agent(user_id)
+        if self.debug_ui and user_id in self.agents:
+            agent = self.agents[user_id]
+            if hasattr(agent.identity, "user_id"):
+                self.debug_ui.agents.pop(int(agent.identity.user_id), None)
 
         logger.info(f"Removed agent for user {user_id}")
 
