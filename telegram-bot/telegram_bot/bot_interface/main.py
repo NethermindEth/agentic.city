@@ -8,9 +8,17 @@ and message processing.
 import asyncio
 import logging
 import signal
-from typing import Callable, Optional
+from typing import Any, Callable, Coroutine, Optional, cast
 
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram import Update
+from telegram.ext import (
+    Application,
+    CallbackContext,
+    CommandHandler,
+    ExtBot,
+    MessageHandler,
+    filters,
+)
 
 from .commands.dump import dump_command
 from .commands.health import health_command
@@ -30,6 +38,23 @@ logger = logging.getLogger(__name__)
 
 # Global application instance
 _app: Optional[Application] = None
+
+# Type aliases for better readability
+CommandCallback = Callable[
+    [
+        Update,
+        CallbackContext[ExtBot[None], dict[Any, Any], dict[Any, Any], dict[Any, Any]],
+    ],
+    Coroutine[Any, Any, None],
+]
+
+ErrorCallback = Callable[
+    [
+        object,
+        CallbackContext[ExtBot[None], dict[Any, Any], dict[Any, Any], dict[Any, Any]],
+    ],
+    Coroutine[Any, Any, None],
+]
 
 
 async def create_application() -> Application:
@@ -54,25 +79,41 @@ async def create_application() -> Application:
 
     # Register handlers
     logger.info("Registering command handlers...")
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("status", status_command))
-    application.add_handler(CommandHandler("info", info_command))
-    application.add_handler(CommandHandler("usage", usage_command))
-    application.add_handler(CommandHandler("dump", dump_command))
-    application.add_handler(CommandHandler("remove_agent", remove_agent_command))
-    application.add_handler(CommandHandler("tools", tools_command))
-    application.add_handler(CommandHandler("health", health_command))
-    application.add_handler(CommandHandler("inspect", inspect_command))
+    application.add_handler(
+        CommandHandler("start", cast(CommandCallback, start_command))
+    )
+    application.add_handler(CommandHandler("help", cast(CommandCallback, help_command)))
+    application.add_handler(
+        CommandHandler("status", cast(CommandCallback, status_command))
+    )
+    application.add_handler(CommandHandler("info", cast(CommandCallback, info_command)))
+    application.add_handler(
+        CommandHandler("usage", cast(CommandCallback, usage_command))
+    )
+    application.add_handler(CommandHandler("dump", cast(CommandCallback, dump_command)))
+    application.add_handler(
+        CommandHandler("remove_agent", cast(CommandCallback, remove_agent_command))
+    )
+    application.add_handler(
+        CommandHandler("tools", cast(CommandCallback, tools_command))
+    )
+    application.add_handler(
+        CommandHandler("health", cast(CommandCallback, health_command))
+    )
+    application.add_handler(
+        CommandHandler("inspect", cast(CommandCallback, inspect_command))
+    )
 
     # Add message handler
     logger.info("Registering message handler...")
     application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND, cast(CommandCallback, handle_message)
+        )
     )
 
     # Add error handler
-    application.add_error_handler(error_handler)
+    application.add_error_handler(cast(ErrorCallback, error_handler))
 
     # Test connection
     logger.info("Testing bot connection...")

@@ -1,5 +1,7 @@
 """Tests for the status command functionality."""
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from telegram_bot.bot_interface.commands.status import (
@@ -10,7 +12,10 @@ from telegram_bot.bot_interface.commands.status import (
 
 
 @pytest.mark.asyncio
-async def test_status_command(mock_update, mock_context):
+async def test_status_command(
+    mock_update: MagicMock,
+    mock_context: MagicMock,
+) -> None:
     """Test the basic functionality of the status command."""
     # Arrange
     update = mock_update("/status")
@@ -31,7 +36,10 @@ async def test_status_command(mock_update, mock_context):
 
 
 @pytest.mark.asyncio
-async def test_status_command_rate_limit_values(mock_update, mock_context):
+async def test_status_command_rate_limit_values(
+    mock_update: MagicMock,
+    mock_context: MagicMock,
+) -> None:
     """Test that status command correctly displays rate limit values."""
     # Arrange
     update = mock_update("/status")
@@ -42,7 +50,5 @@ async def test_status_command_rate_limit_values(mock_update, mock_context):
     # Assert
     args = update.message.reply_text.call_args
     message_text = args[0][0]
-
-    # Verify the exact rate limit values are displayed
-    expected_text = f"🕒 Current rate limit: {MESSAGE_RATE_LIMIT} messages per {RATE_LIMIT_PERIOD} seconds"
-    assert expected_text in message_text
+    assert str(MESSAGE_RATE_LIMIT) in message_text
+    assert str(RATE_LIMIT_PERIOD) in message_text

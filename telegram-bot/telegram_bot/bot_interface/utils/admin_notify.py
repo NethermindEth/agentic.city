@@ -7,7 +7,7 @@ and system notifications to designated bot administrators through Telegram.
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import Any, List, Optional
+from typing import Any, Awaitable, Callable, List, Optional, TypeVar, cast
 
 from telegram import Bot, Update
 from telegram.error import RetryAfter, TelegramError
@@ -80,7 +80,10 @@ async def get_bot() -> Bot:
     return _bot
 
 
-def admin_only(func):
+F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
+
+
+def admin_only(func: F) -> F:
     """Ensure a command can only be used by admin users.
 
     Args:
@@ -91,19 +94,24 @@ def admin_only(func):
     """
 
     async def wrapper(
-        update: "Update", context: "ContextTypes.DEFAULT_TYPE", *args, **kwargs
-    ):
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
         if (
             not update.effective_user
             or str(update.effective_user.id) not in config.admin_ids
         ):
-            await update.message.reply_text(
-                "This command is only available to administrators."
-            )
+            message = update.message
+            if message:
+                await message.reply_text(
+                    "This command is only available to administrators."
+                )
             return
         return await func(update, context, *args, **kwargs)
 
-    return wrapper
+    return cast(F, wrapper)
 
 
 async def notify_admin(

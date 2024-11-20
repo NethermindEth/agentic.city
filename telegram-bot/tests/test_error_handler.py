@@ -1,12 +1,17 @@
 """Tests for the error handler functionality."""
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from telegram_bot.bot_interface.handlers.error_handler import error_handler
 
 
 @pytest.mark.asyncio
-async def test_error_handler_generic_error(mock_update, mock_context):
+async def test_error_handler_generic_error(
+    mock_update: MagicMock,
+    mock_context: MagicMock,
+) -> None:
     """Test the error handler's response to a generic exception."""
     # Arrange
     update = mock_update()
@@ -23,7 +28,10 @@ async def test_error_handler_generic_error(mock_update, mock_context):
 
 
 @pytest.mark.asyncio
-async def test_error_handler_network_error(mock_update, mock_context):
+async def test_error_handler_network_error(
+    mock_update: MagicMock,
+    mock_context: MagicMock,
+) -> None:
     """Test the error handler's response to a network error."""
     # Arrange
     update = mock_update()

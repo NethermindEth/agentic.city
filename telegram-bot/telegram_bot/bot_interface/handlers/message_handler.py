@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Store message timestamps for rate limiting
 _user_messages: defaultdict = defaultdict(list)
-MAX_MESSAGES = 10  # Maximum messages per time window
+MAX_MESSAGES = 5  # Maximum messages per time window
 TIME_WINDOW = timedelta(minutes=1)  # Time window for rate limiting
 
 
@@ -69,9 +69,11 @@ def check_rate_limit(user_id: int) -> bool:
         if current_time - timestamp < TIME_WINDOW
     ]
 
+    # Check if user has exceeded rate limit
     if len(_user_messages[user_id]) >= MAX_MESSAGES:
         return False
 
+    # Add current message timestamp
     _user_messages[user_id].append(current_time)
     return True
 

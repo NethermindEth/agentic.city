@@ -36,10 +36,12 @@ async def remove_agent_command(
         update: The update containing the command
         context: The context for this handler
     """
-    if not update.message or not context.args:
-        await update.message.reply_text(
-            "Please provide a user ID.\n" "Usage: /remove_agent <user_id>"
-        )
+    message = update.message
+    if not message or not context.args:
+        if message:
+            await message.reply_text(
+                "Please provide a user ID.\n" "Usage: /remove_agent <user_id>"
+            )
         return
 
     user_identifier = context.args[0]
@@ -49,12 +51,10 @@ async def remove_agent_command(
         if user_identifier.isdigit():
             user_id = int(user_identifier)
             agent_manager.remove_agent(user_id)  # remove_agent now returns None
-            await update.message.reply_text(
-                f"Successfully removed agent for user ID: {user_id}"
-            )
+            await message.reply_text(f"Agent for user {user_id} has been removed.")
         else:
-            await update.message.reply_text(
+            await message.reply_text(
                 "Invalid user ID format. Please provide a numeric ID."
             )
     except Exception as e:
-        await update.message.reply_text(f"Failed to remove agent: {str(e)}")
+        await message.reply_text(f"Error removing agent: {str(e)}")

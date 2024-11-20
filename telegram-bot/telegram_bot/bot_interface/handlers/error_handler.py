@@ -28,19 +28,18 @@ async def error_handler(
             await handle_telegram_error(update, context, context.error)
         else:
             # Format traceback for unknown errors
-            tb_list = traceback.format_exception(
-                None, context.error, context.error.__traceback__
-            )
-            tb_string = "".join(tb_list)
+            error = context.error
+            if error is not None and isinstance(error, Exception):
+                tb_list = traceback.format_exception(None, error, error.__traceback__)
+                tb_string = "".join(tb_list)
 
-            # Send error message to admin
-            if update and update.effective_message:
-                await update.effective_message.reply_text(
-                    "An error occurred while processing your request. "
-                    "The administrator has been notified."
-                )
+                # Send error message to admin
+                if update and update.effective_message:
+                    await update.effective_message.reply_text(
+                        "Sorry, I encountered an error. The administrator has been notified."
+                    )
 
-            logger.error(f"Update {update} caused error:\n{tb_string}")
+                logger.error(f"Update {update} caused error:\n{tb_string}")
 
     except Exception as e:
         logger.error(f"Error in error handler: {e}", exc_info=True)

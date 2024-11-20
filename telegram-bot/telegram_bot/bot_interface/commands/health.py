@@ -2,6 +2,7 @@
 
 import json
 import time
+from typing import Awaitable, Callable
 
 import psutil
 from telegram import Update
@@ -10,8 +11,17 @@ from telegram.ext import ContextTypes
 from telegram_bot.agents.agent_manager import agent_manager
 
 
-def admin_only(func):
-    """Restrict command access to admin users only."""
+def admin_only(
+    func: Callable[[Update, ContextTypes.DEFAULT_TYPE], Awaitable[None]]
+) -> Callable[[Update, ContextTypes.DEFAULT_TYPE], Awaitable[None]]:
+    """Restrict command access to admin users only.
+
+    Args:
+        func: The function to wrap with admin-only access
+
+    Returns:
+        A wrapped function that checks for admin access before executing
+    """
 
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not update.message or not update.effective_user:
@@ -23,8 +33,9 @@ def admin_only(func):
             and update.effective_user.username.lower() == admin_id.lower()
         )
 
-        if not is_admin:
-            await update.message.reply_text(
+        message = update.message
+        if not is_admin and message:
+            await message.reply_text(
                 "⚠️ This command is only available to the bot administrator."
             )
             return
@@ -44,6 +55,9 @@ async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         update: The update containing the command
         context: The context for this handler
     """
+    if not update.message:
+        return
+
     try:
         process = psutil.Process()
         memory = process.memory_info()

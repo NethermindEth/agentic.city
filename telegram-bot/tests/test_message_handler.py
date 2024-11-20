@@ -1,8 +1,10 @@
 """Tests for the message handler functionality."""
 
 from datetime import datetime, timedelta
+from unittest.mock import MagicMock
 
 import pytest
+from telegram.ext import ContextTypes
 
 from telegram_bot.bot_interface.handlers.message_handler import (
     _user_messages as user_message_counts,
@@ -14,7 +16,10 @@ from telegram_bot.bot_interface.handlers.message_handler import (
 
 
 @pytest.mark.asyncio
-async def test_handle_empty_message(mock_update, mock_context):
+async def test_handle_empty_message(
+    mock_update: MagicMock,
+    mock_context: ContextTypes.DEFAULT_TYPE,
+) -> None:
     """Test handling of empty messages."""
     # Arrange
     update = mock_update("")
@@ -28,7 +33,10 @@ async def test_handle_empty_message(mock_update, mock_context):
 
 
 @pytest.mark.asyncio
-async def test_handle_rate_limit_exceeded(mock_update, mock_context):
+async def test_handle_rate_limit_exceeded(
+    mock_update: MagicMock,
+    mock_context: ContextTypes.DEFAULT_TYPE,
+) -> None:
     """Test behavior when user exceeds message rate limit."""
     # Arrange
     update = mock_update("Test message")
@@ -50,7 +58,7 @@ async def test_handle_rate_limit_exceeded(mock_update, mock_context):
     )
 
 
-def test_check_rate_limit():
+def test_check_rate_limit() -> None:
     """Test the rate limiting functionality."""
     # Arrange
     user_id = 12345
