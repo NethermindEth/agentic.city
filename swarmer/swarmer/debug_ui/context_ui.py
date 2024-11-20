@@ -10,8 +10,7 @@ from swarmer.contexts.crypto_context import CryptoContext
 from swarmer.contexts.memory_context import MemoryContext
 from swarmer.contexts.persona_context import PersonaContext
 from swarmer.contexts.tool_creation_context import ToolCreationContext
-from swarmer.message import Message
-from swarmer.swarmer_types import AgentIdentity, Context
+from swarmer.swarmer_types import AgentIdentity, Context, Message
 
 
 class ContextDebugUI(ABC):

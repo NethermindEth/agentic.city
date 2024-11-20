@@ -397,7 +397,7 @@ class DebugUIServer:
                         context_uis[context.id] = context_ui.render()
 
             # Get constitution text
-            from swarmer.globals.consitution import constitution
+            from swarmer.globals.constitution import constitution
 
             constitution_text = constitution.instruction
 

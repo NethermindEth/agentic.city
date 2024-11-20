@@ -19,6 +19,7 @@ eth-account = "^0.13.4"
 eth-typing = "^5.0.1"
 web3 = "^7.5.0"
 werkzeug = "^3.0.1"
+nicegui = "^1.4.6"
 
 [tool.poetry.dev-dependencies]
 mypy = "^1.8.0"

@@ -13,8 +13,7 @@ from litellm import completion
 
 from swarmer.globals.agent_registry import agent_registry
 from swarmer.globals.constitution import constitution
-from swarmer.message import Message
-from swarmer.swarmer_types import AgentBase, AgentContext, AgentIdentity, Tool
+from swarmer.swarmer_types import AgentBase, AgentContext, AgentIdentity, Message, Tool
 from swarmer.tools.utils import ToolResponse
 
 T = Any
