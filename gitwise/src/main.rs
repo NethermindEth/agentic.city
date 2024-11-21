@@ -107,14 +107,24 @@ async fn main() -> Result<()> {
         }
         Commands::Commit => {
             let repo = Repository::open_from_env()?;
+            
+            // Check if there are staged changes
+            let mut index = repo.index()?;
+            if index.is_empty() {
+                println!("No changes to commit");
+                return Ok(());
+            }
+            
+            // Get the diff of staged changes
             let mut opts = git2::DiffOptions::new();
-            let diff = repo.diff_index_to_workdir(None, Some(&mut opts))?;
+            let head_tree = repo.head()?.peel_to_tree()?;
+            let diff = repo.diff_tree_to_index(Some(&head_tree), None, Some(&mut opts))?;
             
             let message = engine.generate_commit_message(&diff).await?;
             
             // Create the commit
             let signature = repo.signature()?;
-            let tree_id = repo.index()?.write_tree()?;
+            let tree_id = index.write_tree()?;
             let tree = repo.find_tree(tree_id)?;
             let parent = repo.head()?.peel_to_commit()?;
             
