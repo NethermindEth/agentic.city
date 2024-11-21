@@ -14,7 +14,7 @@
 
 [Key Features](#features) •
 [Installation](#installation) •
-[Usage](#current-usage) •
+[Usage](#usage) •
 [Contributing](#contributing)
 
 </div>
@@ -32,6 +32,7 @@ GitWise is your intelligent Git companion that brings the power of AI to your ve
 - **🔍 Flexible Git Navigation**: Work with any git reference - branches, commits, tags, or relative refs
 - **🎯 Customizable Insights**: Tailor AI analysis to focus on what you care about - security, performance, or API changes
 - **🛠️ Developer-Friendly**: Built in Rust for speed and reliability, with an intuitive CLI interface
+- **🚀 Intelligent PRs**: Create pull requests with AI-generated titles and descriptions
 
 ### 🎯 Perfect for:
 
@@ -64,6 +65,13 @@ GitWise is your intelligent Git companion that brings the power of AI to your ve
 - AI-powered understanding of code changes
 - Imperative mood and concise descriptions
 
+### 🚀 Pull Request Creation
+- Create PRs with AI-generated titles and descriptions
+- Automatically generate comprehensive PR descriptions from your changes
+- Support for custom base branches and remote repositories
+- Override AI-generated content with custom titles and descriptions
+- Seamless integration with GitHub through the GitHub CLI
+
 ### 📜 Advanced Git History
 - Explore commit history with AI summaries
 - Start from any git reference (branch, tag, or commit)
@@ -85,11 +93,6 @@ GitWise is your intelligent Git companion that brings the power of AI to your ve
 - Compare any two branches with AI-powered summaries
 - Get high-level insights about changes between branches
 - Understand complex changes at a glance
-
-### 🚀 Intelligent PR Management (Coming Soon)
-- Generate comprehensive PR descriptions automatically
-- Seamless integration with GitHub CLI
-- One-command PR creation and publishing
 
 ### 📦 Smart Staging (Coming Soon)
 - Automatically group staged changes by logical units
@@ -113,7 +116,7 @@ GitWise is your intelligent Git companion that brings the power of AI to your ve
 - Rust (1.70 or later)
 - Git
 - OpenAI API key
-- GitHub CLI (for upcoming PR-related features)
+- GitHub CLI (gh) - Required for PR creation
 
 ### Building from Source
 ```bash
@@ -124,6 +127,9 @@ cd gitwise
 # Create .env file and add your OpenAI API key
 echo "OPENAI_API_KEY=your-api-key-here" > .env
 
+# Ensure GitHub CLI is installed and authenticated
+gh auth login
+
 # Build the project
 cargo build --release
 
@@ -131,77 +137,43 @@ cargo build --release
 ./target/release/gitwise
 ```
 
-### Current Usage
+## Usage Examples
 
+### Intelligent Diff Analysis
 ```bash
-# Get help
-gitwise --help
+# Compare branches with custom focus
+gitwise diff main feature/new-feature --prompt "Focus on security changes"
 
-# Summarize changes between branches
-gitwise diff main feature/new-feature
-
-# Summarize staged changes
-gitwise diff --staged
-
-# Compare specific commits
-gitwise diff abc123 def456
-
-# Compare with relative references
-gitwise diff HEAD~3 HEAD
-
-# Customize diff summary behavior
-gitwise diff main feature/new-feature --prompt "Focus on security-related changes"
-gitwise diff HEAD~3 HEAD --prompt "List only modified function names"
-gitwise diff --staged --prompt "Summarize in bullet points"
-
-# Generate commit message for staged changes
-gitwise commit
-
-# View history with AI summaries
-gitwise history --count 5
-
-# View history from a specific reference
-gitwise history --reference feature/my-branch
-
-# Customize history summary behavior
-gitwise history --count 3 --prompt "Focus on API changes"
-gitwise history --reference main --prompt "Group changes by component"
+# Analyze staged changes
+gitwise diff --staged --prompt "List modified functions"
 ```
 
-### AI Customization
-
-The `--prompt` option allows you to customize how the AI summarizes changes. Here are some examples:
-
-#### For Diffs
-- `--prompt "Focus on security changes"`
-- `--prompt "List only modified function names"`
-- `--prompt "Highlight performance impacts"`
-- `--prompt "Summarize in bullet points"`
-- `--prompt "Group by component or module"`
-
-#### For History
-- `--prompt "Focus on API changes"`
-- `--prompt "Show only breaking changes"`
-- `--prompt "Organize by feature area"`
-- `--prompt "Include test coverage changes"`
-- `--prompt "List affected dependencies"`
-
-### Coming Soon
+### Smart Commit Messages
 ```bash
-# Generate PR description
-gitwise pr describe
+# Generate AI-powered commit message
+gitwise commit
+```
 
-# Create PR and publish
-gitwise pr publish
+### Pull Request Creation
+```bash
+# Create PR with AI-generated title and description
+gitwise pr create
 
-# Smart staging of changes
-gitwise stage
+# Create PR with custom base branch
+gitwise pr create --base develop
 
-# Search through git history
-gitwise search "database optimization changes"
+# Create PR with custom title (AI-generated description)
+gitwise pr create --title "Add user authentication"
 
-# Rewrite branch history
-gitwise rewrite feature/my-branch
+# Create PR with custom title and description
+gitwise pr create --title "Add user authentication" --body "Implements JWT authentication"
+```
+
+### History Analysis
+```bash
+# View recent changes with AI insights
+gitwise history --count 5
+gitwise history --reference feature/branch --prompt "Focus on API changes"
 ```
 
 ## Development

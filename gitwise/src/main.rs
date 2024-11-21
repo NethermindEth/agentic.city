@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
 use git2::{Repository, Oid};
 
@@ -22,6 +22,18 @@ enum Commands {
         /// Custom prompt for feature analysis
         #[arg(long, help = "Custom prompt for feature analysis (e.g., 'Focus on UI changes' or 'Look for security-related changes')")]
         prompt: Option<String>,
+    },
+    /// Create a pull request with AI-generated title and description
+    Pr {
+        /// Base branch for the PR
+        #[arg(long, help = "Base branch for the PR (e.g., 'main' or 'develop')")]
+        base: Option<String>,
+        /// Custom PR title
+        #[arg(long, help = "Custom PR title (if not provided, will be AI-generated)")]
+        title: Option<String>,
+        /// Custom PR description
+        #[arg(long, help = "Custom PR description (if not provided, will be AI-generated)")]
+        body: Option<String>,
     },
     /// Summarize changes between git references
     Diff {
@@ -102,7 +114,7 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     let engine = ai::AiEngine::new()?;
 
-    match cli.command {
+    match &cli.command {
         Commands::Add { prompt } => {
             let repo = Repository::open_from_env()?;
             
@@ -142,9 +154,25 @@ async fn main() -> Result<()> {
             
             println!("\nSuggested commit message:\n{}", commit_msg);
         }
+        Commands::Pr { base, title, body } => {
+            let mut pr = git::pr::PullRequest::new();
+            
+            if let Some(t) = title {
+                pr = pr.with_title(t.clone());
+            }
+            if let Some(b) = body {
+                pr = pr.with_body(b.clone());
+            }
+            if let Some(base_branch) = base {
+                pr = pr.with_base(base_branch.clone());
+            }
+            
+            pr.create().await?;
+            println!("✨ Pull request created successfully!");
+        }
         Commands::Diff { from, to, staged, prompt } => {
             let repo = Repository::open_from_env()?;
-            let diff = if staged {
+            let diff = if *staged {
                 // Get diff of staged changes
                 let mut opts = git2::DiffOptions::new();
                 let head_tree = repo.head()?.peel_to_tree()?;
@@ -204,44 +232,50 @@ async fn main() -> Result<()> {
         }
         Commands::History { reference, count, prompt } => {
             let repo = Repository::open_from_env()?;
-            let start_commit = repo.find_commit(resolve_reference(&repo, &reference)?)?;
+            let branch = if reference == "HEAD" {
+                None
+            } else {
+                Some(reference.as_str())
+            };
+            
+            let commits = git::get_log(&repo, branch, Some(*count))?;
             
             let mut revwalk = repo.revwalk()?;
-            revwalk.push(start_commit.id())?;
+            revwalk.push(repo.head()?.target().ok_or_else(|| anyhow!("Invalid HEAD reference"))?)?;
             revwalk.set_sorting(git2::Sort::TIME)?;
 
             let mut summaries = Vec::new();
-            for (i, oid) in revwalk.take(count as usize).enumerate() {
+            for (i, oid) in revwalk.take(*count as usize).enumerate() {
                 let oid = oid?;
                 let commit = repo.find_commit(oid)?;
                 let tree = commit.tree()?;
                 
                 let parent = commit.parent(0).ok();
-                let parent_tree = parent.as_ref().map(|c| c.tree().ok()).flatten();
+                let parent_tree = parent.as_ref().map(|c| c.tree()).transpose()?;
                 
                 let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), None)?;
-                let summary = engine.summarize_diff(&diff, prompt.as_ref().map(|s| s.as_str())).await?;
+                let summary = engine.summarize_diff(&diff, prompt.as_deref()).await?;
                 
                 summaries.push(format!(
-                    "Commit {} ({}):\n{}\n",
+                    "Commit {} - {}\n{}\n",
                     &oid.to_string()[..7],
                     commit.summary().unwrap_or("No summary"),
                     summary
                 ));
 
-                if i < count as usize - 1 {
+                if i < *count as usize - 1 {
                     summaries.push(String::from("\n---\n\n"));
                 }
             }
 
             println!("Git History Summary:\n");
             for summary in summaries {
-                println!("{}", summary);
+                print!("{}", summary);
             }
         }
         Commands::Log { branch, limit } => {
             let repo = Repository::open_from_env()?;
-            let commits = git::get_log(&repo, branch.as_deref(), Some(limit))?;
+            let commits = git::get_log(&repo, branch.as_deref(), Some(*limit))?;
             
             // Build the log output
             let mut output = String::new();
