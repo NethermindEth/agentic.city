@@ -1,6 +1,54 @@
 # GitWise 🌳
 
-An intelligent Git history exploration and manipulation tool powered by AI.
+<div align="center">
+
+<img src="assets/logo.svg" width="150" height="150" alt="GitWise Logo">
+
+# The Ultimate AI-Powered Git Companion
+
+[![Rust](https://img.shields.io/badge/rust-v1.70%2B-orange)]()
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
+[![OpenAI](https://img.shields.io/badge/AI-GPT--3.5-blue)]()
+
+**GitWise revolutionizes your Git workflow with AI-driven insights and intelligent version control.**
+
+[Key Features](#features) •
+[Installation](#installation) •
+[Usage](#current-usage) •
+[Contributing](#contributing)
+
+</div>
+
+---
+
+## 🚀 Overview
+
+GitWise is your intelligent Git companion that brings the power of AI to your version control workflow. It understands your code changes, generates meaningful commit messages, and provides insightful summaries of your Git history.
+
+### ✨ Why GitWise?
+
+- **🤖 AI-Powered Understanding**: Get intelligent summaries of code changes that focus on what matters
+- **📝 Smart Commit Messages**: Generate clear, concise, and meaningful commit messages automatically
+- **🔍 Flexible Git Navigation**: Work with any git reference - branches, commits, tags, or relative refs
+- **🎯 Customizable Insights**: Tailor AI analysis to focus on what you care about - security, performance, or API changes
+- **🛠️ Developer-Friendly**: Built in Rust for speed and reliability, with an intuitive CLI interface
+
+### 🎯 Perfect for:
+
+- Teams wanting to maintain high-quality git history
+- Developers reviewing large changes or complex PRs
+- Code reviewers needing quick insights into changes
+- Anyone wanting to understand code changes more efficiently
+
+### 🌟 Key Benefits
+
+- **Save Time**: Get instant, meaningful summaries of code changes
+- **Improve Quality**: Generate consistent, well-formatted commit messages
+- **Better Understanding**: Focus on the important changes with AI-powered insights
+- **Enhanced Collaboration**: Make code reviews and history exploration more efficient
+- **Flexible Usage**: Works with any Git workflow and supports all types of repositories
+
+---
 
 ## Current Features
 
