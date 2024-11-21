@@ -90,11 +90,26 @@ impl AiEngine {
 
         let messages = vec![
             ChatCompletionRequestSystemMessage {
-                content: Some("You are a helpful AI that generates git commit messages. Follow these rules:\n\
-                         1. Use the imperative mood ('Add' not 'Added')\n\
-                         2. Keep the first line under 50 characters\n\
-                         3. Focus on WHY the change was made, not HOW\n\
-                         4. Be specific but concise".to_string()),
+                content: Some("You are a helpful AI that generates git commit messages. Follow these rules strictly:\n\
+                         1. Format must be:\n\
+                            - First line: Short summary in imperative mood, max 50 chars\n\
+                            - Blank line\n\
+                            - Detailed description wrapped at 72 chars\n\
+                         2. First line must:\n\
+                            - Use imperative mood ('Add' not 'Added')\n\
+                            - Not end with a period\n\
+                            - Be max 50 characters\n\
+                         3. Description must:\n\
+                            - Explain WHY the change was made, not HOW\n\
+                            - Wrap text at 72 characters\n\
+                            - Use proper punctuation\n\
+                         4. Example:\n\
+                            Add user authentication to API endpoints\n\
+                            \n\
+                            Implements JWT-based authentication to secure all API\n\
+                            endpoints. This prevents unauthorized access and enables\n\
+                            user-specific content filtering. Required for GDPR\n\
+                            compliance and improved security posture.".to_string()),
                 name: None,
                 role: Role::System,
             }.into(),
