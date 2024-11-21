@@ -255,9 +255,6 @@ impl AiEngine {
             .clone()
             .unwrap_or_else(|| "[]".to_string());
 
-        // Debug log the AI response
-        println!("DEBUG: AI Response:\n{}", message);
-
         // Try to parse the response
         let groups: Vec<Vec<String>> = serde_json::from_str(&message)
             .with_context(|| format!("Failed to parse AI response as JSON array of file groups. Response was: {}", message))?;
