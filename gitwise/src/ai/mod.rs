@@ -157,6 +157,83 @@ impl AiEngine {
 
         Ok(message)
     }
+
+    /// Analyze changes and group them by feature
+    pub async fn analyze_changes(&self, staged_diff: &Diff<'_>, unstaged_diff: &Diff<'_>, prompt: Option<&str>) -> Result<Vec<Vec<String>>> {
+        let mut all_changes = String::new();
+        
+        // Helper function to format diff
+        let mut format_diff = |diff: &Diff<'_>, prefix: &str| -> Result<()> {
+            diff.print(git2::DiffFormat::Patch, |delta, _hunk, line| {
+                if let Some(path) = delta.new_file().path() {
+                    match line.origin_value() {
+                        git2::DiffLineType::Addition => all_changes.push_str(&format!("{} +{} ({})\n", prefix, String::from_utf8_lossy(line.content()), path.display())),
+                        git2::DiffLineType::Deletion => all_changes.push_str(&format!("{} -{} ({})\n", prefix, String::from_utf8_lossy(line.content()), path.display())),
+                        _ => (),
+                    }
+                }
+                true
+            })?;
+            Ok(())
+        };
+        
+        // Format both staged and unstaged changes
+        format_diff(staged_diff, "[Staged]")?;
+        format_diff(unstaged_diff, "[Unstaged]")?;
+        
+        if all_changes.is_empty() {
+            return Ok(vec![]); // Return empty array if no changes
+        }
+        
+        let default_prompt = "You are a helpful AI that analyzes git changes. \
+            Your task is to group the changes by feature or logical unit of work. \
+            Each group should contain related changes that belong together. \
+            Focus on the semantic meaning of the changes rather than just file locations. \
+            IMPORTANT: Your response must be a valid JSON array where each element is an array of file paths. \
+            Example response format: [[\"file1.rs\", \"file2.rs\"], [\"file3.rs\"]]. \
+            Only output the JSON array, no other text or explanations.";
+        
+        let messages = vec![
+            ChatCompletionRequestSystemMessage {
+                content: Some(default_prompt.to_string()),
+                name: None,
+                role: Role::System,
+            }.into(),
+            ChatCompletionRequestUserMessage {
+                content: Some(ChatCompletionRequestUserMessageContent::Text(
+                    format!("Group these changes by feature (custom focus: {}):\n```\n{}\n```",
+                        prompt.unwrap_or("none"),
+                        all_changes)
+                )),
+                name: None,
+                role: Role::User,
+            }.into(),
+        ];
+
+        let request = CreateChatCompletionRequest {
+            model: "gpt-3.5-turbo".into(),
+            messages,
+            temperature: Some(0.3),
+            max_tokens: Some(1000),
+            ..Default::default()
+        };
+
+        let response = self.client.chat().create(request).await?;
+        let message = response.choices[0]
+            .message
+            .content
+            .clone()
+            .unwrap_or_else(|| "[]".to_string());
+
+        // Debug log the AI response
+        println!("DEBUG: AI Response:\n{}", message);
+
+        // Try to parse the response
+        let groups: Vec<Vec<String>> = serde_json::from_str(&message)
+            .with_context(|| format!("Failed to parse AI response as JSON array of file groups. Response was: {}", message))?;
+
+        Ok(groups)
+    }
 }
 
 #[cfg(test)]
