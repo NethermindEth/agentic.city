@@ -25,6 +25,9 @@ enum Commands {
         /// Show staged changes instead
         #[arg(short, long)]
         staged: bool,
+        /// Custom prompt for AI summarization
+        #[arg(long, help = "Custom prompt for AI summarization (e.g., 'Focus on security changes' or 'List only modified functions')")]
+        prompt: Option<String>,
     },
     /// Generate a commit message for staged changes
     Commit,
@@ -36,6 +39,9 @@ enum Commands {
         /// Number of commits to summarize
         #[arg(short, long, default_value_t = 5)]
         count: u32,
+        /// Custom prompt for AI summarization
+        #[arg(long, help = "Custom prompt for AI summarization (e.g., 'Focus on API changes' or 'Summarize in bullet points')")]
+        prompt: Option<String>,
     },
 }
 
@@ -79,7 +85,7 @@ async fn main() -> Result<()> {
     let engine = ai::AiEngine::new()?;
 
     match cli.command {
-        Commands::Diff { from, to, staged } => {
+        Commands::Diff { from, to, staged, prompt } => {
             let repo = Repository::open_from_env()?;
             let diff = if staged {
                 // Get diff of staged changes
@@ -102,7 +108,7 @@ async fn main() -> Result<()> {
                 repo.diff_tree_to_tree(Some(&from_tree), Some(&to_tree), None)?
             };
 
-            let summary = engine.summarize_diff(&diff).await?;
+            let summary = engine.summarize_diff(&diff, prompt.as_deref()).await?;
             println!("Changes Summary:\n{}", summary);
         }
         Commands::Commit => {
@@ -139,7 +145,7 @@ async fn main() -> Result<()> {
             
             println!("Created commit with message:\n{}", message);
         }
-        Commands::History { reference, count } => {
+        Commands::History { reference, count, prompt } => {
             let repo = Repository::open_from_env()?;
             let start_commit = repo.find_commit(resolve_reference(&repo, &reference)?)?;
             
@@ -157,7 +163,7 @@ async fn main() -> Result<()> {
                 let parent_tree = parent.as_ref().map(|c| c.tree().ok()).flatten();
                 
                 let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), None)?;
-                let summary = engine.summarize_diff(&diff).await?;
+                let summary = engine.summarize_diff(&diff, prompt.as_ref().map(|s| s.as_str())).await?;
                 
                 summaries.push(format!(
                     "Commit {} ({}):\n{}\n",

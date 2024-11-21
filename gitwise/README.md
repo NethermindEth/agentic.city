@@ -101,6 +101,11 @@ gitwise diff abc123 def456
 # Compare with relative references
 gitwise diff HEAD~3 HEAD
 
+# Customize diff summary behavior
+gitwise diff main feature/new-feature --prompt "Focus on security-related changes"
+gitwise diff HEAD~3 HEAD --prompt "List only modified function names"
+gitwise diff --staged --prompt "Summarize in bullet points"
+
 # Generate commit message for staged changes
 gitwise commit
 
@@ -109,7 +114,29 @@ gitwise history --count 5
 
 # View history from a specific reference
 gitwise history --reference feature/my-branch
+
+# Customize history summary behavior
+gitwise history --count 3 --prompt "Focus on API changes"
+gitwise history --reference main --prompt "Group changes by component"
 ```
+
+### AI Customization
+
+The `--prompt` option allows you to customize how the AI summarizes changes. Here are some examples:
+
+#### For Diffs
+- `--prompt "Focus on security changes"`
+- `--prompt "List only modified function names"`
+- `--prompt "Highlight performance impacts"`
+- `--prompt "Summarize in bullet points"`
+- `--prompt "Group by component or module"`
+
+#### For History
+- `--prompt "Focus on API changes"`
+- `--prompt "Show only breaking changes"`
+- `--prompt "Organize by feature area"`
+- `--prompt "Include test coverage changes"`
+- `--prompt "List affected dependencies"`
 
 ### Coming Soon
 ```bash

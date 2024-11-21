@@ -28,7 +28,7 @@ impl AiEngine {
     }
 
     /// Summarize a git diff using AI
-    pub async fn summarize_diff(&self, diff: &Diff<'_>) -> Result<String> {
+    pub async fn summarize_diff(&self, diff: &Diff<'_>, custom_prompt: Option<&str>) -> Result<String> {
         let mut diff_text = String::new();
         diff.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
             use git2::DiffLineType::*;
@@ -41,9 +41,16 @@ impl AiEngine {
             true
         })?;
 
+        let base_prompt = "You are a helpful AI that summarizes git diffs. Focus on the key changes and their implications. Be concise but informative.";
+        let prompt = if let Some(custom) = custom_prompt {
+            format!("{}. Additional instruction: {}", base_prompt, custom)
+        } else {
+            base_prompt.to_string()
+        };
+
         let messages = vec![
             ChatCompletionRequestSystemMessage {
-                content: Some("You are a helpful AI that summarizes git diffs. Focus on the key changes and their implications. Be concise but informative.".to_string()),
+                content: Some(prompt),
                 name: None,
                 role: Role::System,
             }.into(),
@@ -166,7 +173,7 @@ mod tests {
         
         // Create an empty diff
         let diff = repo.diff_tree_to_tree(None, None, None).unwrap();
-        let summary = engine.summarize_diff(&diff).await.unwrap();
+        let summary = engine.summarize_diff(&diff, None).await.unwrap();
         assert!(summary.contains("No summary available."));
     }
 }
