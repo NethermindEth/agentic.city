@@ -9,22 +9,217 @@ use async_openai::{
     },
     Client, config::OpenAIConfig,
 };
+use anthropic::{
+    client::{Client as AnthropicClient, ClientBuilder},
+    types::{MessagesRequest, Role as AnthropicRole, Message, ContentBlock},
+};
 use git2::Diff;
 use std::env;
+use tracing::{debug, info};
+
+// Constants for token limits
+const ANTHROPIC_MAX_TOKENS: usize = 4096;
+const OPENAI_MAX_TOKENS: u16 = 4096;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ModelProvider {
+    Anthropic,
+    OpenAI,
+}
 
 pub struct AiEngine {
-    client: Client<OpenAIConfig>,
+    openai_client: Option<Client<OpenAIConfig>>,
+    anthropic_client: Option<AnthropicClient>,
+    enforced_provider: Option<ModelProvider>,
 }
 
 impl AiEngine {
-    /// Create a new AI engine
+    /// Create a new AI engine, preferring Claude if available
     pub fn new() -> Result<Self> {
         dotenv::dotenv().ok();
-        let api_key = env::var("OPENAI_API_KEY")
-            .context("OPENAI_API_KEY environment variable not found")?;
         
-        let client = Client::with_config(OpenAIConfig::new().with_api_key(api_key));
-        Ok(Self { client })
+        // Try to create Anthropic client first
+        let anthropic_client = match env::var("ANTHROPIC_API_KEY") {
+            Ok(api_key) => {
+                debug!("Found Anthropic API key");
+                Some(ClientBuilder::default()
+                    .api_key(api_key)
+                    .build()
+                    .context("Failed to create Anthropic client")?)
+            },
+            Err(_) => {
+                debug!("No Anthropic API key found");
+                None
+            }
+        };
+
+        // Try to create OpenAI client as fallback
+        let openai_client = match env::var("OPENAI_API_KEY") {
+            Ok(api_key) => {
+                debug!("Found OpenAI API key");
+                Some(Client::with_config(OpenAIConfig::new().with_api_key(api_key)))
+            },
+            Err(_) => {
+                debug!("No OpenAI API key found");
+                None
+            }
+        };
+
+        Ok(Self {
+            openai_client,
+            anthropic_client,
+            enforced_provider: None,
+        })
+    }
+
+    /// Set the enforced model provider
+    pub fn with_provider(mut self, provider: ModelProvider) -> Self {
+        self.enforced_provider = Some(provider);
+        self
+    }
+
+    /// Helper to generate text using available AI provider
+    pub async fn generate_text(&self, system_prompt: &str, user_message: &str) -> Result<String> {
+        debug!("Generating text with system prompt: {}", system_prompt);
+        debug!("User message: {}", user_message);
+
+        match (self.enforced_provider.as_ref(), &self.anthropic_client, &self.openai_client) {
+            // Enforced Anthropic
+            (Some(ModelProvider::Anthropic), Some(client), _) => {
+                info!("Using Anthropic's Claude model");
+                let request = MessagesRequest {
+                    model: "claude-3-sonnet-20240229".to_string(),
+                    system: system_prompt.to_string(),
+                    messages: vec![
+                        Message {
+                            role: AnthropicRole::User,
+                            content: vec![ContentBlock::Text { text: user_message.to_string() }],
+                        }
+                    ],
+                    max_tokens: ANTHROPIC_MAX_TOKENS,
+                    ..Default::default()
+                };
+
+                debug!("Sending request to Anthropic API");
+                let response = client.messages(request).await
+                    .map_err(|e| anyhow::anyhow!("Anthropic API error: {}", e))?;
+                
+                debug!("Received response from Anthropic API");
+                let text = response.content.into_iter()
+                    .filter_map(|block| match block {
+                        ContentBlock::Text { text } => Some(text),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                Ok(text)
+            },
+            // Enforced OpenAI
+            (Some(ModelProvider::OpenAI), _, Some(client)) => {
+                info!("Using OpenAI's GPT model");
+                let messages = vec![
+                    ChatCompletionRequestSystemMessage {
+                        content: Some(system_prompt.to_string()),
+                        name: None,
+                        role: Role::System,
+                    }.into(),
+                    ChatCompletionRequestUserMessage {
+                        content: Some(ChatCompletionRequestUserMessageContent::Text(
+                            user_message.to_string()
+                        )),
+                        name: None,
+                        role: Role::User,
+                    }.into(),
+                ];
+
+                let request = CreateChatCompletionRequest {
+                    model: "gpt-3.5-turbo".into(),
+                    messages,
+                    temperature: Some(0.7),
+                    max_tokens: Some(OPENAI_MAX_TOKENS),
+                    ..Default::default()
+                };
+
+                debug!("Sending request to OpenAI API");
+                let response = client.chat().create(request).await?;
+                debug!("Received response from OpenAI API");
+                Ok(response.choices[0]
+                    .message
+                    .content
+                    .clone()
+                    .unwrap_or_else(|| "No response available.".to_string()))
+            },
+            // Default behavior: prefer Anthropic if available
+            (None, Some(client), _) => {
+                info!("Using default provider: Anthropic's Claude model");
+                let request = MessagesRequest {
+                    model: "claude-3-sonnet-20240229".to_string(),
+                    system: system_prompt.to_string(),
+                    messages: vec![
+                        Message {
+                            role: AnthropicRole::User,
+                            content: vec![ContentBlock::Text { text: user_message.to_string() }],
+                        }
+                    ],
+                    max_tokens: ANTHROPIC_MAX_TOKENS,
+                    ..Default::default()
+                };
+
+                debug!("Sending request to Anthropic API");
+                let response = client.messages(request).await
+                    .map_err(|e| anyhow::anyhow!("Anthropic API error: {}", e))?;
+                
+                debug!("Received response from Anthropic API");
+                let text = response.content.into_iter()
+                    .filter_map(|block| match block {
+                        ContentBlock::Text { text } => Some(text),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                Ok(text)
+            },
+            // Fallback to OpenAI
+            (None, None, Some(client)) => {
+                info!("Using fallback provider: OpenAI's GPT model");
+                let messages = vec![
+                    ChatCompletionRequestSystemMessage {
+                        content: Some(system_prompt.to_string()),
+                        name: None,
+                        role: Role::System,
+                    }.into(),
+                    ChatCompletionRequestUserMessage {
+                        content: Some(ChatCompletionRequestUserMessageContent::Text(
+                            user_message.to_string()
+                        )),
+                        name: None,
+                        role: Role::User,
+                    }.into(),
+                ];
+
+                let request = CreateChatCompletionRequest {
+                    model: "gpt-3.5-turbo".into(),
+                    messages,
+                    temperature: Some(0.7),
+                    max_tokens: Some(OPENAI_MAX_TOKENS),
+                    ..Default::default()
+                };
+
+                debug!("Sending request to OpenAI API");
+                let response = client.chat().create(request).await?;
+                debug!("Received response from OpenAI API");
+                Ok(response.choices[0]
+                    .message
+                    .content
+                    .clone()
+                    .unwrap_or_else(|| "No response available.".to_string()))
+            },
+            // No available clients
+            _ => {
+                info!("No AI provider available");
+                Err(anyhow::anyhow!("No AI provider available. Please set ANTHROPIC_API_KEY or OPENAI_API_KEY environment variable."))
+            },
+        }
     }
 
     /// Summarize a git diff using AI
@@ -48,37 +243,7 @@ impl AiEngine {
             base_prompt.to_string()
         };
 
-        let messages = vec![
-            ChatCompletionRequestSystemMessage {
-                content: Some(prompt),
-                name: None,
-                role: Role::System,
-            }.into(),
-            ChatCompletionRequestUserMessage {
-                content: Some(ChatCompletionRequestUserMessageContent::Text(
-                    format!("Please summarize this git diff:\n```\n{}\n```", diff_text)
-                )),
-                name: None,
-                role: Role::User,
-            }.into(),
-        ];
-
-        let request = CreateChatCompletionRequest {
-            model: "gpt-3.5-turbo".into(),
-            messages,
-            temperature: Some(0.7),
-            max_tokens: Some(512),
-            ..Default::default()
-        };
-
-        let response = self.client.chat().create(request).await?;
-        let summary = response.choices[0]
-            .message
-            .content
-            .clone()
-            .unwrap_or_else(|| "No summary available.".to_string());
-
-        Ok(summary)
+        self.generate_text(&prompt, &format!("Please summarize this git diff:\n```\n{}\n```", diff_text)).await
     }
 
     /// Generate a commit message for the given diff
@@ -86,10 +251,10 @@ impl AiEngine {
         let mut changes = String::new();
         diff.print(git2::DiffFormat::Patch, |delta, _hunk, line| {
             if let Some(path) = delta.new_file().path() {
-            match line.origin_value() {
+                match line.origin_value() {
                     git2::DiffLineType::Addition => changes.push_str(&format!("+ {} ({})\n", String::from_utf8_lossy(line.content()), path.display())),
                     git2::DiffLineType::Deletion => changes.push_str(&format!("- {} ({})\n", String::from_utf8_lossy(line.content()), path.display())),
-                _ => (),
+                    _ => (),
                 }
             }
             true
@@ -99,67 +264,25 @@ impl AiEngine {
             return Ok("No changes detected.".to_string());
         }
 
-        let messages = vec![
-            ChatCompletionRequestSystemMessage {
-                content: Some("You are a helpful AI that generates git commit messages. Follow these rules strictly:\n\
-                         1. Format must be:\n\
-                            - First line: Short summary in imperative mood, max 50 chars\n\
-                            - Blank line\n\
-                            - Detailed description wrapped at 72 chars\n\
-                         2. First line must:\n\
-                            - Use imperative mood ('Add' not 'Added')\n\
-                            - Not end with a period\n\
-                            - Be max 50 characters\n\
-                            - Accurately describe the main change in the diff\n\
-                         3. Description must:\n\
-                            - Start with a blank line after the summary\n\
-                            - Explain WHY the changes in the diff were made\n\
-                            - Wrap text at 72 characters\n\
-                            - Use proper punctuation\n\
-                            - Be specific to the actual changes shown\n\
-                            - Include affected files or components\n\
-                         4. Example:\n\
-                            Add user authentication to API endpoints\n\
-                            \n\
-                            Implements JWT-based authentication to secure all API endpoints in\n\
-                            auth.rs. This change is required for GDPR compliance and improves\n\
-                            our overall security posture by preventing unauthorized access.\n\
-                            \n\
-                            Modified files:\n\
-                            - auth.rs: Added JWT verification\n\
-                            - main.rs: Integrated auth middleware\n\
-                         5. Important:\n\
-                            - Focus ONLY on the changes shown in the diff\n\
-                            - Do not make up changes that aren't in the diff\n\
-                            - Be specific about what files or components changed".to_string()),
-                name: None,
-                role: Role::System,
-            }.into(),
-            ChatCompletionRequestUserMessage {
-                content: Some(ChatCompletionRequestUserMessageContent::Text(
-                    format!("Analyze these changes and create a commit summary:\n```\n{}\n```", changes)
-                )),
-                name: None,
-                role: Role::User,
-            }.into(),
-        ];
+        let prompt = "You are a helpful AI that generates git commit messages. Follow these rules strictly:\n\
+                     1. Format must be:\n\
+                        - First line: Short summary in imperative mood, max 50 chars\n\
+                        - Blank line\n\
+                        - Detailed description wrapped at 72 chars\n\
+                     2. First line must:\n\
+                        - Use imperative mood ('Add' not 'Added')\n\
+                        - Not end with a period\n\
+                        - Be max 50 characters\n\
+                        - Accurately describe the main change in the diff\n\
+                     3. Description must:\n\
+                        - Start with a blank line after the summary\n\
+                        - Explain WHY the changes in the diff were made\n\
+                        - Wrap text at 72 characters\n\
+                        - Use proper punctuation\n\
+                        - Be specific to the actual changes shown\n\
+                        - Include affected files or components";
 
-        let request = CreateChatCompletionRequest {
-            model: "gpt-3.5-turbo".into(),
-            messages,
-            temperature: Some(0.3),
-            max_tokens: Some(300),
-            ..Default::default()
-        };
-
-        let response = self.client.chat().create(request).await?;
-        let message = response.choices[0]
-            .message
-            .content
-            .clone()
-            .unwrap_or_else(|| "Failed to generate commit message.".to_string());
-
-        Ok(message)
+        self.generate_text(prompt, &format!("Analyze these changes and create a commit summary:\n```\n{}\n```", changes)).await
     }
 
     /// Analyze changes and group them by feature
@@ -188,7 +311,7 @@ impl AiEngine {
         if all_changes.is_empty() {
             return Ok(vec![]); // Return empty array if no changes
         }
-        
+
         let default_prompt = "You are an expert Git user who thinks holistically about changes. \
             FIRST AND MOST IMPORTANT RULE: If all the changes could reasonably be part of one development effort, \
             return them as a single group. Default to this approach unless there are COMPLETELY unrelated changes. \
@@ -223,41 +346,16 @@ impl AiEngine {
             Note how the example shows everything in ONE group - this is what we usually want! \
             Only output the JSON array, no other text or explanations.";
 
-        let messages = vec![
-            ChatCompletionRequestSystemMessage {
-                content: Some(default_prompt.to_string()),
-                name: None,
-                role: Role::System,
-            }.into(),
-            ChatCompletionRequestUserMessage {
-                content: Some(ChatCompletionRequestUserMessageContent::Text(
-                    format!("Group these changes by feature (custom focus: {}):\n```\n{}\n```",
-                        prompt.unwrap_or("none"),
-                        all_changes)
-                )),
-                name: None,
-                role: Role::User,
-            }.into(),
-        ];
-
-        let request = CreateChatCompletionRequest {
-            model: "gpt-3.5-turbo".into(),
-            messages,
-            temperature: Some(0.3),
-            max_tokens: Some(1000),
-            ..Default::default()
-        };
-
-        let response = self.client.chat().create(request).await?;
-        let message = response.choices[0]
-            .message
-            .content
-            .clone()
-            .unwrap_or_else(|| "[]".to_string());
+        let response = self.generate_text(
+            default_prompt,
+            &format!("Group these changes by feature (custom focus: {}):\n```\n{}\n```",
+                prompt.unwrap_or("none"),
+                all_changes)
+        ).await?;
 
         // Try to parse the response
-        let groups: Vec<Vec<String>> = serde_json::from_str(&message)
-            .with_context(|| format!("Failed to parse AI response as JSON array of file groups. Response was: {}", message))?;
+        let groups: Vec<Vec<String>> = serde_json::from_str(&response)
+            .with_context(|| format!("Failed to parse AI response as JSON array of file groups. Response was: {}", response))?;
 
         Ok(groups)
     }

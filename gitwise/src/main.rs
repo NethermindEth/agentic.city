@@ -1,6 +1,8 @@
 use anyhow::{Result, anyhow};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use git2::{Repository, Oid};
+use tracing::info;
+use tracing_subscriber::fmt;
 
 mod ai;
 mod utils;
@@ -11,6 +13,14 @@ use git::staging;
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
+    /// Enable verbose logging
+    #[arg(short, long, help = "Enable verbose logging")]
+    verbose: bool,
+
+    /// Force a specific AI model provider
+    #[arg(long, value_enum, help = "Force a specific AI model provider (e.g., 'anthropic' or 'openai')")]
+    model: Option<ModelProvider>,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -75,6 +85,14 @@ enum Commands {
     },
 }
 
+#[derive(clap::ValueEnum, Clone, Debug)]
+enum ModelProvider {
+    /// Use Anthropic's Claude model
+    Anthropic,
+    /// Use OpenAI's GPT model
+    OpenAI,
+}
+
 /// Resolve a git reference (branch, tag, or commit hash) to a commit
 fn resolve_reference(repo: &Repository, reference: &str) -> Result<Oid> {
     // Try as a direct reference first (branch or tag)
@@ -112,7 +130,30 @@ fn resolve_reference(repo: &Repository, reference: &str) -> Result<Oid> {
 async fn main() -> Result<()> {
     dotenv::dotenv().ok();
     let cli = Cli::parse();
-    let engine = ai::AiEngine::new()?;
+
+    // Initialize logging
+    if cli.verbose {
+        fmt()
+            .with_max_level(tracing::Level::DEBUG)
+            .init();
+    } else {
+        fmt()
+            .with_max_level(tracing::Level::INFO)
+            .init();
+    }
+
+    let mut engine = ai::AiEngine::new()?;
+    
+    // Apply model provider if specified
+    if let Some(provider) = cli.model {
+        info!("Using enforced model provider: {:?}", provider);
+        engine = engine.with_provider(match provider {
+            ModelProvider::Anthropic => ai::ModelProvider::Anthropic,
+            ModelProvider::OpenAI => ai::ModelProvider::OpenAI,
+        });
+    } else {
+        info!("Using default model provider selection");
+    }
 
     match &cli.command {
         Commands::Add { prompt } => {

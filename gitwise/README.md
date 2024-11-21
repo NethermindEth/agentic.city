@@ -9,6 +9,7 @@
 [![Rust](https://img.shields.io/badge/rust-v1.70%2B-orange)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
 [![OpenAI](https://img.shields.io/badge/AI-GPT--3.5-blue)]()
+[![Anthropic](https://img.shields.io/badge/AI-Claude%20Sonnet-blue)]()
 
 **GitWise revolutionizes your Git workflow with AI-driven insights and intelligent version control.**
 
@@ -117,6 +118,7 @@ GitWise is your intelligent Git companion that brings the power of AI to your ve
 - Git
 - OpenAI API key
 - GitHub CLI (gh) - Required for PR creation
+- Anthropic API key (Preferred)
 
 ### Building from Source
 ```bash
@@ -124,8 +126,9 @@ GitWise is your intelligent Git companion that brings the power of AI to your ve
 git clone https://github.com/yourusername/gitwise.git
 cd gitwise
 
-# Create .env file and add your OpenAI API key
-echo "OPENAI_API_KEY=your-api-key-here" > .env
+# Create .env file and add your API keys
+echo "ANTHROPIC_API_KEY=your_claude_api_key" > .env  # Preferred
+echo "OPENAI_API_KEY=your_openai_api_key" >> .env     # Fallback
 
 # Ensure GitHub CLI is installed and authenticated
 gh auth login
@@ -136,6 +139,24 @@ cargo build --release
 # The binary will be available at
 ./target/release/gitwise
 ```
+
+## AI Provider Support
+
+GitWise supports multiple AI providers for enhanced reliability and flexibility:
+
+1. **Claude Sonnet (Preferred)**
+   - Provider: Anthropic
+   - Model: claude-3-sonnet-20240229
+   - Features: All core functionality
+   - Setup: Add `ANTHROPIC_API_KEY` to `.env`
+
+2. **GPT-3.5 Turbo (Fallback)**
+   - Provider: OpenAI
+   - Model: gpt-3.5-turbo
+   - Features: All core functionality
+   - Setup: Add `OPENAI_API_KEY` to `.env`
+
+The system will automatically use Claude if available, falling back to OpenAI if needed.
 
 ## Usage Examples
 
@@ -203,5 +224,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Acknowledgments
 - Built with [Rust](https://www.rust-lang.org/)
 - Git operations via [git2-rs](https://github.com/rust-lang/git2-rs)
-- AI powered by [OpenAI](https://openai.com/)
+- AI powered by [OpenAI](https://openai.com/) and [Anthropic](https://anthropic.com/)
 - Terminal UI powered by [Ratatui](https://github.com/tui-rs-revival/ratatui) (coming soon)
