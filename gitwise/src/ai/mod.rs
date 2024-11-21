@@ -185,14 +185,40 @@ impl AiEngine {
             return Ok(vec![]); // Return empty array if no changes
         }
         
-        let default_prompt = "You are a helpful AI that analyzes git changes. \
-            Your task is to group the changes by feature or logical unit of work. \
-            Each group should contain related changes that belong together. \
-            Focus on the semantic meaning of the changes rather than just file locations. \
+        let default_prompt = "You are an expert Git user who thinks holistically about changes. \
+            FIRST AND MOST IMPORTANT RULE: If all the changes could reasonably be part of one development effort, \
+            return them as a single group. Default to this approach unless there are COMPLETELY unrelated changes. \
+            \
+            When deciding whether to group ALL changes together, consider: \
+            - Are they part of the same general development session? \
+            - Could they be described under one high-level goal? \
+            - Do they affect related areas of the codebase? \
+            - Would they make sense to review together? \
+            If YES to ANY of these, PUT EVERYTHING IN ONE GROUP. \
+            \
+            Only split into multiple groups if you find changes that are: \
+            1. Completely different features with zero relationship \
+            2. Fixes for entirely separate bugs \
+            3. Changes that absolutely cannot be described in one commit message \
+            \
+            Examples of changes that should be ONE group: \
+            - A feature implementation + its tests + docs + config changes \
+            - Multiple refactorings across the codebase \
+            - A mix of bug fixes in related components \
+            - Frontend changes + related backend updates \
+            - Multiple improvements to similar functionality \
+            \
+            Remember: \
+            - STRONGLY PREFER one large group over multiple small ones \
+            - If unsure, put everything in one group \
+            - It's better to group too much than too little \
+            - Only split if it would be IMPOSSIBLE to describe the changes together \
+            \
             IMPORTANT: Your response must be a valid JSON array where each element is an array of file paths. \
-            Example response format: [[\"file1.rs\", \"file2.rs\"], [\"file3.rs\"]]. \
+            Example response format: [[\"file1.rs\", \"file2.rs\", \"test1.rs\", \"mod.rs\", \"config.toml\", \"docs.md\"]] \
+            Note how the example shows everything in ONE group - this is what we usually want! \
             Only output the JSON array, no other text or explanations.";
-        
+
         let messages = vec![
             ChatCompletionRequestSystemMessage {
                 content: Some(default_prompt.to_string()),

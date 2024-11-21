@@ -4,6 +4,9 @@ use git2::{Repository, Oid};
 
 mod ai;
 mod utils;
+mod git;
+
+use git::staging;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -14,6 +17,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Intelligently stage changes by feature
+    Add {
+        /// Custom prompt for feature analysis
+        #[arg(long, help = "Custom prompt for feature analysis (e.g., 'Focus on UI changes' or 'Look for security-related changes')")]
+        prompt: Option<String>,
+    },
     /// Summarize changes between git references
     Diff {
         /// First git reference (branch, commit, or tag)
@@ -85,6 +94,45 @@ async fn main() -> Result<()> {
     let engine = ai::AiEngine::new()?;
 
     match cli.command {
+        Commands::Add { prompt } => {
+            let repo = Repository::open_from_env()?;
+            
+            // Get staged and unstaged changes
+            let staged_diff = staging::get_staged_changes(&repo)?;
+            let unstaged_diff = staging::get_unstaged_changes(&repo)?;
+            
+            // Get current status for all files
+            let (_staged_files, unstaged_files) = staging::get_change_groups(&repo)?;
+            
+            // Skip if no changes
+            if unstaged_files.is_empty() {
+                println!("No changes to stage.");
+                return Ok(());
+            }
+            
+            // Analyze changes and group them by feature
+            let groups = engine.analyze_changes(&staged_diff, &unstaged_diff, prompt.as_deref()).await?;
+            
+            if groups.is_empty() {
+                println!("No changes to stage.");
+                return Ok(());
+            }
+
+            // Take the first group as our suggestion
+            let selected_group = &groups[0];
+            
+            println!("\nStaging files for feature:");
+            for file in selected_group {
+                println!("  {}", file);
+                staging::stage_file(&repo, file)?;
+            }
+
+            // Get fresh diff after staging
+            let new_staged_diff = staging::get_staged_changes(&repo)?;
+            let commit_msg = engine.generate_commit_message(&new_staged_diff).await?;
+            
+            println!("\nSuggested commit message:\n{}", commit_msg);
+        }
         Commands::Diff { from, to, staged, prompt } => {
             let repo = Repository::open_from_env()?;
             let diff = if staged {

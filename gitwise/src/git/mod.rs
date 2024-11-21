@@ -1,7 +1,3 @@
-use anyhow::Result;
-use git2::{Repository, Diff};
-use std::path::Path;
-
 mod diff;
 mod history;
 pub mod staging;
