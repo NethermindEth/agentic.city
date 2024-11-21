@@ -101,17 +101,22 @@ impl AiEngine {
                             - Be max 50 characters\n\
                             - Accurately describe the main change in the diff\n\
                          3. Description must:\n\
+                            - Start with a blank line after the summary\n\
                             - Explain WHY the changes in the diff were made\n\
                             - Wrap text at 72 characters\n\
                             - Use proper punctuation\n\
                             - Be specific to the actual changes shown\n\
+                            - Include affected files or components\n\
                          4. Example:\n\
                             Add user authentication to API endpoints\n\
                             \n\
-                            Implements JWT-based authentication to secure all API\n\
-                            endpoints. This prevents unauthorized access and enables\n\
-                            user-specific content filtering. Required for GDPR\n\
-                            compliance and improved security posture.\n\
+                            Implements JWT-based authentication to secure all API endpoints in\n\
+                            auth.rs. This change is required for GDPR compliance and improves\n\
+                            our overall security posture by preventing unauthorized access.\n\
+                            \n\
+                            Modified files:\n\
+                            - auth.rs: Added JWT verification\n\
+                            - main.rs: Integrated auth middleware\n\
                          5. Important:\n\
                             - Focus ONLY on the changes shown in the diff\n\
                             - Do not make up changes that aren't in the diff\n\
