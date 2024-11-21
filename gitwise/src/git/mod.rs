@@ -1,8 +1,8 @@
 mod diff;
-mod history;
+mod log;
 pub mod staging;
 
 // Re-export commonly used items
 pub use diff::*;
-pub use history::*;
+pub use log::*;
 pub use staging::*;

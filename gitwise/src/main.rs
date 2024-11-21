@@ -52,6 +52,15 @@ enum Commands {
         #[arg(long, help = "Custom prompt for AI summarization (e.g., 'Focus on API changes' or 'Summarize in bullet points')")]
         prompt: Option<String>,
     },
+    /// Show commit history with AI-generated summaries
+    Log {
+        /// Show commits from this branch
+        #[arg(short, long)]
+        branch: Option<String>,
+        /// Limit the number of commits shown
+        #[arg(short, long, default_value = "10")]
+        limit: u32,
+    },
 }
 
 /// Resolve a git reference (branch, tag, or commit hash) to a commit
@@ -229,6 +238,56 @@ async fn main() -> Result<()> {
             for summary in summaries {
                 println!("{}", summary);
             }
+        }
+        Commands::Log { branch, limit } => {
+            let repo = Repository::open_from_env()?;
+            let commits = git::get_log(&repo, branch.as_deref(), Some(limit))?;
+            
+            // Build the log output
+            let mut output = String::new();
+            
+            for commit in commits {
+                let hash = commit.id();
+                let time = commit.time();
+                let datetime = chrono::DateTime::<chrono::Utc>::from_timestamp(time.seconds(), 0)
+                    .unwrap()
+                    .format("%Y-%m-%d %H:%M:%S");
+                
+                // Commit header
+                output.push_str(&format!("\n\x1b[33mcommit {}\x1b[0m\n", hash));
+                output.push_str(&format!("Author: {}\n", commit.author()));
+                output.push_str(&format!("Date:   {}\n\n", datetime));
+                
+                // AI Summary
+                let diff = git::get_commit_diff(&repo, &commit)?;
+                let summary = engine.generate_commit_message(&diff).await?;
+                output.push_str("\x1b[36mAI Summary:\x1b[0m\n");
+                output.push_str(&format!("{}\n", summary.replace("\n", "\n    ")));
+                
+                // Separator
+                output.push_str("\n\x1b[90m----------------------------------------\x1b[0m\n");
+                
+                // Original message
+                if let Some(msg) = commit.message() {
+                    output.push_str("\x1b[32mOriginal Message:\x1b[0m\n");
+                    output.push_str(&format!("{}\n", msg.trim().replace("\n", "\n    ")));
+                }
+                
+                output.push_str("\n");
+            }
+            
+            // Open in pager
+            let mut child = std::process::Command::new("less")
+                .arg("-R")  // Enable color codes
+                .stdin(std::process::Stdio::piped())
+                .spawn()?;
+            
+            if let Some(mut stdin) = child.stdin.take() {
+                use std::io::Write;
+                stdin.write_all(output.as_bytes())?;
+            }
+            
+            child.wait()?;
         }
     }
 

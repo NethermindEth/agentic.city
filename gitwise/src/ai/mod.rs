@@ -81,19 +81,23 @@ impl AiEngine {
         Ok(summary)
     }
 
-    /// Generate a commit message based on staged changes
+    /// Generate a commit message for the given diff
     pub async fn generate_commit_message(&self, diff: &Diff<'_>) -> Result<String> {
-        let mut diff_text = String::new();
-        diff.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
-            use git2::DiffLineType::*;
+        let mut changes = String::new();
+        diff.print(git2::DiffFormat::Patch, |delta, _hunk, line| {
+            if let Some(path) = delta.new_file().path() {
             match line.origin_value() {
-                Addition => diff_text.push_str(&format!("+{}", String::from_utf8_lossy(line.content()))),
-                Deletion => diff_text.push_str(&format!("-{}", String::from_utf8_lossy(line.content()))),
-                Context => diff_text.push_str(&format!(" {}", String::from_utf8_lossy(line.content()))),
+                    git2::DiffLineType::Addition => changes.push_str(&format!("+ {} ({})\n", String::from_utf8_lossy(line.content()), path.display())),
+                    git2::DiffLineType::Deletion => changes.push_str(&format!("- {} ({})\n", String::from_utf8_lossy(line.content()), path.display())),
                 _ => (),
+                }
             }
             true
         })?;
+
+        if changes.is_empty() {
+            return Ok("No changes detected.".to_string());
+        }
 
         let messages = vec![
             ChatCompletionRequestSystemMessage {
@@ -133,7 +137,7 @@ impl AiEngine {
             }.into(),
             ChatCompletionRequestUserMessage {
                 content: Some(ChatCompletionRequestUserMessageContent::Text(
-                    format!("Generate a commit message for these changes:\n```\n{}\n```", diff_text)
+                    format!("Analyze these changes and create a commit summary:\n```\n{}\n```", changes)
                 )),
                 name: None,
                 role: Role::User,
@@ -143,8 +147,8 @@ impl AiEngine {
         let request = CreateChatCompletionRequest {
             model: "gpt-3.5-turbo".into(),
             messages,
-            temperature: Some(0.7),
-            max_tokens: Some(256),
+            temperature: Some(0.3),
+            max_tokens: Some(300),
             ..Default::default()
         };
 
@@ -153,7 +157,7 @@ impl AiEngine {
             .message
             .content
             .clone()
-            .unwrap_or_else(|| "No commit message available.".to_string());
+            .unwrap_or_else(|| "Failed to generate commit message.".to_string());
 
         Ok(message)
     }

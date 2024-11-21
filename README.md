@@ -14,11 +14,22 @@ Agentic.City aims to create a robust framework for autonomous agents that can:
 
 | Experiment | Description | Status |
 |------------|-------------|---------|
+| gitwise | AI-powered Git companion for intelligent version control and code analysis | 🟢 Active |
 | swarmer | Modular framework for building intelligent agents with context-based architecture, dynamic tool creation, and state persistence | 🟢 Active |
 | telegram-bot | Production-ready Telegram bot with command handling, rate limiting, and error handling | 🟡 In Progress |
 | scripts | Utility scripts including Ollama wrapper and HTTP request helpers | 🟡 In Progress |
 
 ## Components
+
+### GitWise 🌳
+
+An intelligent Git companion that brings AI-powered insights to your version control workflow. Key features include:
+- AI-powered diff summarization and commit message generation
+- Smart branch comparison and PR management
+- Semantic Git history search
+- Built in Rust for performance and reliability
+
+[Learn more about GitWise](./gitwise/README.md)
 
 ### Swarmer Framework 🤖
 
