@@ -1,0 +1,30 @@
+{
+  "python_version": "3.12",
+  "dependencies": [
+    "langgraph-cli[inmem]",
+    "langchain",
+    "langchain-openai",
+    "langchain-community",
+    "pydantic",
+    "python-dotenv",
+    "."
+  ],
+  "graphs": {
+    "main": "agents/main.py:graph"
+  },
+  "env": "./.env",
+  "exclude": [
+    "**/__pycache__",
+    "**/.git",
+    "**/.pytest_cache",
+    "**/.DS_Store",
+    "**/node_modules",
+    "**/dist",
+    "**/build"
+  ],
+  "python_path": ["."],
+  "include": [
+    "agents/config/config.py",
+    "agents/__init__.py"
+  ]
+}

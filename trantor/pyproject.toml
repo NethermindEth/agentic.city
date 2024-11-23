@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trantor"
+version = "0.1.0"
+description = "LangGraph Agent Management System"
+requires-python = ">=3.12"
+dependencies = [
+    "langgraph-cli[inmem]",
+    "langchain",
+    "langchain-openai",
+    "langchain-community",
+    "pydantic",
+    "python-dotenv"
+]
+
+[tool.setuptools]
+packages = ["agents"]
+
+[tool.setuptools.package-data]
+agents = ["**/*.py"]
