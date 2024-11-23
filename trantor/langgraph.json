@@ -24,7 +24,7 @@
   ],
   "python_path": ["."],
   "include": [
-    "agents/config/config.py",
+    "agents/config.py",
     "agents/__init__.py"
   ]
 }
